@@ -1,0 +1,54 @@
+---
+- name: Fetch and process devices from Device42
+  hosts: localhost
+  gather_facts: false
+  vars:
+    device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
+    # Base64 ile zaten encode edilmiş "admin:AA123456."
+    device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
+
+  tasks:
+    - name: Retrieve all devices from Device42
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        headers:
+          Authorization: "{{ device42_auth_header }}"
+        return_content: yes
+        status_code: 200
+        # Eğer self-signed sertifika kullanıyorsan:
+        validate_certs: no
+      register: device42_response
+
+    - name: Parse JSON response into a list
+      set_fact:
+        devices: "{{ device42_response.json.devices  | default(device42_response.json) }}"
+
+    - name: Show how many devices were returned
+      debug:
+        msg: "{{ devices | length }} cihaz çekildi."
+
+    - name: Process each device (örnek düzenleme)
+      loop: "{{ devices }}"
+      loop_control:
+        label: "{{ item.name | default(item.device_name) }}"
+      block:
+        - name: Uppercase device name and add timestamp note
+          set_fact:
+            modified:
+              name: "{{ item.name | upper }}"
+              serial_number: "{{ item.serial_number }}"
+              note: "Processed by AWX on {{ ansible_date_time.iso8601 }}"
+
+        - name: Debug modified record
+          debug:
+            var: modified
+
+        # → Burada istersen `uri` ile PUT/POST yaparak Device42’ye güncelleme gönderebilir,
+        #    istersen veriyi bir dosyaya yazdırabilir ya da inventory’ye ekleyebilirsin.
+
+    - name: Dump all raw devices to a file for later editing
+      copy:
+        content: "{{ devices | to_nice_json }}"
+        dest: "/tmp/device42_devices_raw.json"
+        mode: '0644'
