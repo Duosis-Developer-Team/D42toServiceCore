@@ -1,13 +1,13 @@
 ---
-- name: Fetch and chunk Device42 devices
+- name: Fetch and split Device42 devices one-by-one
   hosts: localhost
   gather_facts: false
 
   vars:
-    # AWX Extra Vars üzerinden de geçirebilirsiniz
     device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
-    chunk_size: 500
+    # her bir chunk'ta 1 cihaz olacak
+    chunk_size: 1
 
   tasks:
     - name: Retrieve all devices from Device42
@@ -25,11 +25,11 @@
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
-    - name: Split devices into chunks of size {{ chunk_size }}
+    - name: Split devices into individual chunks
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size, []) }}"
 
-    - name: Expose each chunk as its own variable (devices_chunk_1, devices_chunk_2, …)
+    - name: Expose each device as its own chunk variable
       set_fact:
         "{{ 'devices_chunk_' ~ (idx + 1) }}": "{{ item }}"
       loop: "{{ device_chunks }}"
@@ -38,9 +38,8 @@
 
     - name: Show how many chunks were created
       debug:
-        msg: "{{ device_chunks | length }} chunks created."
+        msg: "{{ device_chunks | length }} cihaz için {{ device_chunks | length }} ayrı chunk oluşturuldu."
 
-    - name: (Optional) Debug first chunk
+    - name: (Optional) Show first device chunk
       debug:
         var: devices_chunk_1
-        
