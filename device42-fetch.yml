@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    # AWX Extra Vars kısmından da geçirebilirsiniz
+    # AWX Extra Vars üzerinden de geçirebilirsiniz
     device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
     chunk_size: 500
@@ -21,15 +21,15 @@
         validate_certs: no
       register: device42_response
 
-    - name: Extract devices list from response
+    - name: Parse devices list from response JSON
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
-    - name: Split devices into chunks of {{ chunk_size }}
+    - name: Split devices into chunks of size {{ chunk_size }}
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size, []) }}"
 
-    - name: Expose each chunk as its own variable (devices_chunk_1, devices_chunk_2, ...)
+    - name: Expose each chunk as its own variable (devices_chunk_1, devices_chunk_2, …)
       set_fact:
         "{{ 'devices_chunk_' ~ (idx + 1) }}": "{{ item }}"
       loop: "{{ device_chunks }}"
@@ -40,6 +40,7 @@
       debug:
         msg: "{{ device_chunks | length }} chunks created."
 
-    - name: (Optional) Show first chunk
+    - name: (Optional) Debug first chunk
       debug:
         var: devices_chunk_1
+        
