@@ -1,16 +1,16 @@
 ---
-- name: Fetch, chunk and process Device42 devices
+- name: Fetch and chunk Device42 devices
   hosts: localhost
   gather_facts: false
 
   vars:
-    # Bu değerleri AWX Job Template üzerinden Extra Variables kısmında da verebilirsiniz
+    # AWX Extra Vars kısmından da geçirebilirsiniz
     device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
     chunk_size: 500
 
   tasks:
-    - name: Get all devices from Device42
+    - name: Retrieve all devices from Device42
       uri:
         url: "{{ device42_api_url }}"
         method: GET
@@ -21,7 +21,7 @@
         validate_certs: no
       register: device42_response
 
-    - name: Extract device list from response
+    - name: Extract devices list from response
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
@@ -36,27 +36,10 @@
       loop_control:
         index_var: idx
 
-    - name: Debug number of chunks created
+    - name: Show how many chunks were created
       debug:
-        msg: "{{ device_chunks | length }} parça oluşturuldu."
+        msg: "{{ device_chunks | length }} chunks created."
 
-    - name: Example: Uppercase device name and annotate (first chunk only)
-      set_fact:
-        modified: "{{ modified | default([]) + [ {
-          'name': (item.name | default('UNKNOWN')) | upper,
-          'serial_number': item.serial_no | default(item.serial_number),
-          'note': 'Processed by AWX on ' ~ ansible_date_time.iso8601
-        } ] }}"
-      loop: "{{ devices_chunk_1 }}"
-      loop_control:
-        label: "{{ item.name | default(item.device_name) }}"
-
-    - name: Debug modified devices (first chunk only)
+    - name: (Optional) Show first chunk
       debug:
-        var: modified
-
-    - name: Dump original device list to file (optional)
-      copy:
-        content: "{{ devices | to_nice_json }}"
-        dest: "/tmp/device42_devices_raw.json"
-        mode: '0644'
+        var: devices_chunk_1
