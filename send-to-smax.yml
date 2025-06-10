@@ -1,17 +1,17 @@
 ---
-- name: Send Device42 devices to SMAX (güncellenmiş mapping)
+- name: Send Device42 devices to SMAX (updated)
   hosts: localhost
   gather_facts: false
 
   vars:
-    # Device42 ile ilgili değişkenler
+    # Device42
     device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
     chunk_size: 1
 
-    # SMAX ile ilgili değişkenler
+    # SMAX
     smax_api_url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
-    smax_cookie: "SMAX_AUTH_TOKEN=eyJraWQiOiIxNmMyODk0MzRkODU0MGViODBiODBjNzg4MWY3MGIxNCIsInR5cCI6IkpXUyIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyYzkwODRhNzk2ZGFhY2I5MDE5NzEwN2FhZWNlMmM3MSIsImlzcyI6Imh0dHBzOi8vZGVzdGVrLmthZmVpbi5jb20udHI6NDQzL2lkbS1zZXJ2aWNlL29pZGMiLCJjb20uaHBlLmlkbTp0cnVzdG9yIjpudWxsLCJleHAiOjE3NDgzNTA2MzgsImNvbS5ocC5jbG91ZDp0ZW5hbnQiOnsiaWQiOiIyYzkwODRhNzk2ZGFhY2I5MDE5NzEwNzljYzg0MmMyNyIsIm5hbWUiOiI2Njk4NjYwNTAiLCJlbmFibGVkIjp0cnVlLCJ0eXBlIjoiUFJPVklERVIifSwicHJuIjoiZHVvc2lzLmFkbWluIiwiaWF0IjoxNzQ4MzQ3MDM4LCJqdGkiOiJiMmY1NGMyNC01MTk4LTQzYWQtOGZkZC02OTY0NzdhMzI0M2MifQ.Bf_DvDBr7Epo1_4EnJ0gXIe4eJmumE2XJOLq-l_qvxeQ-94b-m3LodyczcOk7O6tliitg2EMVxFvXRK3omqW-hH4Kqox3mo6zDmoQp2PDV4SOuQ5jq0QPDWT-5l2Yo9qj1bfFwg_vB0IclVuHHhUU7U-JyT8SF3ONHJRTybQdbMZ-SwwsOxwjnDHXeX0niDvW6lTn9Jwlvj9l1a-CTcq7cexLgUch9CxwxDgNGT8T3cD7F-abGpfR96WWsJS59KnET4T62TvVh35ycCoGyWjA5SoGr7zdAZ_eBfJuDnrXudJp-bUVEwt5FCb3UDKzkYiS6t-xlGrKMyqPUkcwDPxPw"
+    smax_cookie: "SMAX_AUTH_TOKEN=eyJraWQiOiIxNmMyODk0MzRkODU0MGViODBiODBjNzg4MWY3MGIxNCIsInR5cCI6IkpXUyIsImFsZyI6IlJTMjU2In0.…"
 
   tasks:
     - name: 1) Retrieve all devices from Device42
@@ -78,7 +78,8 @@
         validate_certs: no
       loop: "{{ device_chunks }}"
       loop_control:
-        label: "chunk_{{ loop.index }}"
+        index_var: idx
+        label: "chunk_{{ idx }}"
       register: smax_responses
 
     - name: 6) Show SMAX responses for each chunk
@@ -86,4 +87,5 @@
         var: item
       loop: "{{ smax_responses.results }}"
       loop_control:
-        label: "response_{{ loop.index }}"
+        index_var: rsp_idx
+        label: "response_{{ rsp_idx }}"
