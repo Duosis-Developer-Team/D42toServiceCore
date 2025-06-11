@@ -5,13 +5,13 @@
   gather_facts: false
 
   vars:
-    # Prompt on Launch yaparsanız bu üç satırı Extra Vars olarak girin:
+    # Prompt on Launch ile Extra Vars olarak girin:
     # smax_token_url: "https://destek.kafein.com.tr/auth/authentication-endpoint/authenticate/token?TENANTID=669866050"
     # smax_user:       "duosis.admin"
     # smax_pass:       "duosisITSM.25"
 
   tasks:
-    - name: 1) Get SMAX token via POST (equivalent to your curl)
+    - name: 1) Get SMAX token via POST
       uri:
         url: "{{ smax_token_url }}"
         method: POST
@@ -25,6 +25,6 @@
 
     - name: 2) Expose SMAX_AUTH_TOKEN as workflow fact
       set_stats:
+        scoreboard: global
         data:
-          smax_cookie: >-
-            SMAX_AUTH_TOKEN={{ (auth_resp.content | from_json).token }}
+          smax_cookie: "{{ 'SMAX_AUTH_TOKEN=' + (auth_resp.content | from_json).token }}"
