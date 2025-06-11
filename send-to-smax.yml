@@ -1,16 +1,18 @@
+# send-to-smax.yaml
 ---
-- name: Send Device42 devices to SMAX (via dynamic token)
+- name: Send Device42 devices to SMAX (using dynamic token)
   hosts: localhost
   gather_facts: false
 
   vars:
-    device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
+    # Device42 ayarları
+    device42_api_url:     "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
-    chunk_size: 1
+    chunk_size:           1
 
-    smax_api_url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
-    # workflow’dan gelen fact’i kullanıyoruz
-    smax_cookie: "{{ smax_cookie }}"
+    # SMAX EMS bulk endpoint; cookie workflow’dan geliyor
+    smax_api_url:         "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
+    smax_cookie:          "{{ smax_cookie }}"
 
   tasks:
     - name: 1) Retrieve all devices from Device42
@@ -28,11 +30,11 @@
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
-    - name: 3) Chunk devices (size {{ chunk_size }})
+    - name: 3) Split into chunks of size {{ chunk_size }}
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size, []) }}"
 
-    - name: 4) Show chunk count
+    - name: 4) Show how many chunks
       debug:
         msg: "{{ device_chunks | length }} chunks created."
 
@@ -51,7 +53,7 @@
                   "Cpus": "{{ {'Cpu':[{
                     'CpuType':'',
                     'CpuVendor':'',
-                    'CpuClockSpeed': (device.cpuspeed|default(0)) | string,
+                    'CpuClockSpeed': (device.cpuspeed|default(0))|string,
                     'CpuId':'',
                     'CpuCoreNumber': (device.cpucore|default(device.cpucount|default(0)))
                   }]} | to_json }}",
