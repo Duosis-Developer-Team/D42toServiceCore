@@ -16,14 +16,13 @@
         method: POST
         headers:
           Content-Type: "application/json"
-        body: "{{ { Login: smax_user, Password: smax_pass } | to_json }}"
+        body: "{{ { 'Login': smax_user, 'Password': smax_pass } | to_json }}"
         return_content: yes
         status_code: 200
         validate_certs: no
       register: auth_resp
 
     - name: 2) Set SMAX cookie fact for the workflow
-      # Bu set_stats modülü, AWX workflow general fakta smax_cookie anahtarıyla yazar
       set_stats:
         data:
           smax_cookie: "SMAX_AUTH_TOKEN={{ auth_resp.json.token }}"
