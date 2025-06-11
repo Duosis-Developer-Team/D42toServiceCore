@@ -4,7 +4,6 @@
   gather_facts: false
 
   vars:
-    # SMAX kimlik doğrulama bilgileri
     smax_token_url: "https://destek.kafein.com.tr/auth/authentication-endpoint/authenticate/token?TENANTID=669866050"
     smax_user: "duosis.admin"
     smax_pass: "duosisITSM.25"
@@ -22,7 +21,11 @@
         validate_certs: no
       register: auth_resp
 
-    - name: 2) Set SMAX cookie fact for the workflow
+    - name: 2) Parse token out of response
+      set_fact:
+        smax_cookie: "SMAX_AUTH_TOKEN={{ (auth_resp.content | from_json).token }}"
+
+    - name: 3) Expose smax_cookie to workflow
       set_stats:
         data:
-          smax_cookie: "SMAX_AUTH_TOKEN={{ auth_resp.json.token }}"
+          smax_cookie: "{{ smax_cookie }}"
