@@ -1,15 +1,15 @@
 ---
-- name: Device42 cihazlarını çek ve dosyaya kaydet
+- name: Fetch Device42 devices and save to file
   hosts: localhost
   gather_facts: false
 
   vars:
-    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars ile input
-    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars ile input
-    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars ile input, default 1
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars input
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars input
+    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
 
   tasks:
-    - name: Device42'den cihazları çek
+    - name: Fetch devices from Device42
       uri:
         url: "{{ device42_api_url }}"
         method: GET
@@ -20,27 +20,27 @@
         validate_certs: no
       register: device42_response
 
-    - name: Cihaz listesini ayıkla
+    - name: Extract device list
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
-    - name: Cihazları chunk'lara ayır
+    - name: Split devices into chunks
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
 
-    - name: Cihazları dosyaya kaydet
+    - name: Save devices to file
       copy:
         content: "{{ devices | to_nice_json }}"
         dest: "./device42_devices.json"
 
-    - name: Show how many chunks were created
+    - name: Show number of chunks created
       debug:
         msg: "{{ device_chunks | length }} chunks created."
 
-    - name: Display each chunk individually
+    - name: Display each chunk
       debug:
         var: item
       loop: "{{ device_chunks }}"
       loop_control:
         index_var: idx
-        label: "devices_chunk_{{ idx+1 }}"
+        label: "devices_chunk_{{ idx+1 }}" 

@@ -1,31 +1,31 @@
 # send-to-smax.yaml
 ---
-- name: Device42 cihazlarını SMAX'e insert et
+- name: Insert Device42 devices into SMAX
   hosts: localhost
   gather_facts: false
 
   vars:
-    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars ile input
-    smax_user: "{{ smax_user }}"            # AWX Extra Vars ile input
-    smax_pass: "{{ smax_pass }}"            # AWX Extra Vars ile input
-    smax_api_url: "{{ smax_api_url }}"      # AWX Extra Vars ile input
-    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars ile input, default 1
+    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars input
+    smax_user: "{{ smax_user }}"            # AWX Extra Vars input
+    smax_pass: "{{ smax_pass }}"            # AWX Extra Vars input
+    smax_api_url: "{{ smax_api_url }}"      # AWX Extra Vars input
+    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
 
   tasks:
-    - name: Device42 cihazlarını dosyadan oku
+    - name: Read Device42 devices from file
       slurp:
         src: "./device42_devices.json"
       register: devices_file
 
-    - name: JSON'u parse et
+    - name: Parse JSON
       set_fact:
         devices: "{{ devices_file.content | b64decode | from_json }}"
 
-    - name: Cihazları chunk'lara ayır
+    - name: Split devices into chunks
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
 
-    - name: SMAX token al
+    - name: Get SMAX token
       uri:
         url: "{{ smax_token_url }}"
         method: POST
@@ -37,11 +37,11 @@
         validate_certs: no
       register: smax_token_response
 
-    - name: Token'ı ayıkla
+    - name: Extract token
       set_fact:
         smax_token: "{{ (smax_token_response.content | from_json).token }}"
 
-    - name: Her chunk'ı SMAX'e gönder
+    - name: Send each chunk to SMAX
       vars:
         smax_payload: |
           {
@@ -86,7 +86,7 @@
         label: "chunk_{{ idx }}"
       register: smax_responses
 
-    - name: SMAX yanıtlarını göster
+    - name: Show SMAX responses
       debug:
         var: item
       loop: "{{ smax_responses.results }}"
