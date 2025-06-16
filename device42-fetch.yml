@@ -4,11 +4,9 @@
   gather_facts: false
 
   vars:
-    # AWX Extra Vars üzerinden de geçirebilirsiniz
-    device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
-    device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
-    # chunk_size'ı ihtiyacınıza göre ayarlayın
-    chunk_size: 1
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars ile input
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars ile input
+    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars ile input, default 1
 
   tasks:
     - name: Device42'den cihazları çek
@@ -26,14 +24,14 @@
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
+    - name: Cihazları chunk'lara ayır
+      set_fact:
+        device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
+
     - name: Cihazları dosyaya kaydet
       copy:
         content: "{{ devices | to_nice_json }}"
         dest: "./device42_devices.json"
-
-    - name: Split devices into chunks of size {{ chunk_size }}
-      set_fact:
-        device_chunks: "{{ devices | batch(chunk_size, []) }}"
 
     - name: Show how many chunks were created
       debug:

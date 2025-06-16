@@ -5,11 +5,11 @@
   gather_facts: false
 
   vars:
-    smax_token_url: "https://destek.kafein.com.tr/auth/authentication-endpoint/authenticate/token?TENANTID=669866050"
-    smax_user: "duosis.admin"
-    smax_pass: "duosisITSM.25"
-    smax_api_url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
-    chunk_size: 1
+    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars ile input
+    smax_user: "{{ smax_user }}"            # AWX Extra Vars ile input
+    smax_pass: "{{ smax_pass }}"            # AWX Extra Vars ile input
+    smax_api_url: "{{ smax_api_url }}"      # AWX Extra Vars ile input
+    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars ile input, default 1
 
   tasks:
     - name: Device42 cihazlarını dosyadan oku
@@ -23,7 +23,7 @@
 
     - name: Cihazları chunk'lara ayır
       set_fact:
-        device_chunks: "{{ devices | batch(chunk_size, []) }}"
+        device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
 
     - name: SMAX token al
       uri:
