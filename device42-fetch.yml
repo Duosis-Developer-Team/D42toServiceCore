@@ -1,5 +1,5 @@
 ---
-- name: Fetch and chunk Device42 devices
+- name: Device42 cihazlarını çek ve dosyaya kaydet
   hosts: localhost
   gather_facts: false
 
@@ -7,11 +7,11 @@
     # AWX Extra Vars üzerinden de geçirebilirsiniz
     device42_api_url: "https://213.153.197.248:8585/api/1.0/devices/all"
     device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
-    # chunk_size’ı ihtiyacınıza göre ayarlayın
+    # chunk_size'ı ihtiyacınıza göre ayarlayın
     chunk_size: 1
 
   tasks:
-    - name: Retrieve all devices from Device42
+    - name: Device42'den cihazları çek
       uri:
         url: "{{ device42_api_url }}"
         method: GET
@@ -22,9 +22,14 @@
         validate_certs: no
       register: device42_response
 
-    - name: Parse devices list from response JSON
+    - name: Cihaz listesini ayıkla
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
+
+    - name: Cihazları dosyaya kaydet
+      copy:
+        content: "{{ devices | to_nice_json }}"
+        dest: "./device42_devices.json"
 
     - name: Split devices into chunks of size {{ chunk_size }}
       set_fact:

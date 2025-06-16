@@ -1,44 +1,47 @@
 # send-to-smax.yaml
 ---
-- name: Send Device42 devices to SMAX (using dynamic token)
+- name: Device42 cihazlarını SMAX'e insert et
   hosts: localhost
   gather_facts: false
 
   vars:
-    # Device42 ayarları
-    device42_api_url:     "https://213.153.197.248:8585/api/1.0/devices/all"
-    device42_auth_header: "Basic YWRtaW46QWExMjM0NTYu."
-    chunk_size:           1
-
-    # SMAX EMS bulk endpoint; cookie workflow’dan geliyor
-    smax_api_url:         "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
-    smax_cookie:          "{{ smax_cookie }}"
+    smax_token_url: "https://destek.kafein.com.tr/auth/authentication-endpoint/authenticate/token?TENANTID=669866050"
+    smax_user: "duosis.admin"
+    smax_pass: "duosisITSM.25"
+    smax_api_url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
+    chunk_size: 1
 
   tasks:
-    - name: 1) Retrieve all devices from Device42
-      uri:
-        url: "{{ device42_api_url }}"
-        method: GET
-        headers:
-          Authorization: "{{ device42_auth_header }}"
-        return_content: yes
-        status_code: 200
-        validate_certs: no
-      register: device42_response
+    - name: Device42 cihazlarını dosyadan oku
+      slurp:
+        src: "./device42_devices.json"
+      register: devices_file
 
-    - name: 2) Parse devices list
+    - name: JSON'u parse et
       set_fact:
-        devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
+        devices: "{{ devices_file.content | b64decode | from_json }}"
 
-    - name: 3) Split into chunks of size {{ chunk_size }}
+    - name: Cihazları chunk'lara ayır
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size, []) }}"
 
-    - name: 4) Show how many chunks
-      debug:
-        msg: "{{ device_chunks | length }} chunks created."
+    - name: SMAX token al
+      uri:
+        url: "{{ smax_token_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ { 'Login': smax_user, 'Password': smax_pass } | to_json }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_token_response
 
-    - name: 5) Send each chunk to SMAX
+    - name: Token'ı ayıkla
+      set_fact:
+        smax_token: "{{ (smax_token_response.content | from_json).token }}"
+
+    - name: Her chunk'ı SMAX'e gönder
       vars:
         smax_payload: |
           {
@@ -53,11 +56,11 @@
                   "Cpus": "{{ {'Cpu':[{
                     'CpuType':'',
                     'CpuVendor':'',
-                    'CpuClockSpeed': (device.cpuspeed|default(0))|string,
+                    'CpuClockSpeed': (device.cpuspeed|default(''))|string,
                     'CpuId':'',
-                    'CpuCoreNumber': (device.cpucore|default(device.cpucount|default(0)))
+                    'CpuCoreNumber': (device.cpucore|default(device.cpucount|default(0)))|string
                   }]} | to_json }}",
-                  "IPAddress": "{% if device.ip_addresses|length > 0 %}{{ device.ip_addresses[0].ip }}{% endif %}",
+                  "IpAddresses": "{{ {'IpAddress':[{'IpValue': (device.ip_addresses[0].ip if device.ip_addresses|length > 0 else ''),'IpType':'','AuthoritativeDNSName':'','RoutingDomain':'','GlobalId':'','Keep':'','Id':''}]} | to_json }}",
                   "SerialNo": "{{ device.serial_no | default('') }}",
                   "OSName": "{{ device.os | default('') }}",
                   "OSVersion": "{{ device.osver | default('') }}",
@@ -72,7 +75,7 @@
         url: "{{ smax_api_url }}"
         method: POST
         headers:
-          Cookie: "{{ smax_cookie }}"
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
           Content-Type: "application/json"
         body: "{{ smax_payload }}"
         status_code: 200,201,202
@@ -83,7 +86,7 @@
         label: "chunk_{{ idx }}"
       register: smax_responses
 
-    - name: 6) Show SMAX responses
+    - name: SMAX yanıtlarını göster
       debug:
         var: item
       loop: "{{ smax_responses.results }}"
