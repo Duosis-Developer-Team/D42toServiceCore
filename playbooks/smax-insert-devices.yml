@@ -14,24 +14,6 @@
     chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
 
   tasks:
-    - name: Validate required variables
-      fail:
-        msg: "Required variable '{{ item }}' is not defined. Please provide it in AWX Extra Vars."
-      when: 
-        - item == 'device42_api_url' and device42_api_url == ''
-        - item == 'device42_auth_header' and device42_auth_header == ''
-        - item == 'smax_token_url' and smax_token_url is not defined
-        - item == 'smax_user' and smax_user is not defined
-        - item == 'smax_pass' and smax_pass is not defined
-        - item == 'smax_api_url' and smax_api_url is not defined
-      loop:
-        - device42_api_url
-        - device42_auth_header
-        - smax_token_url
-        - smax_user
-        - smax_pass
-        - smax_api_url
-
     - name: Fetch devices from Device42
       uri:
         url: "{{ device42_api_url }}"
@@ -42,18 +24,27 @@
         status_code: 200
         validate_certs: no
       register: device42_response
+      when: device42_api_url != '' and device42_auth_header != ''
+
+    - name: Fail if Device42 variables are not provided
+      fail:
+        msg: "device42_api_url and device42_auth_header must be provided in AWX Extra Vars"
+      when: device42_api_url == '' or device42_auth_header == ''
 
     - name: Extract device list
       set_fact:
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
+      when: device42_response is defined
 
     - name: Split devices into chunks
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
+      when: devices is defined
 
     - name: Show number of chunks created
       debug:
         msg: "{{ device_chunks | length }} chunks created for SMAX processing."
+      when: device_chunks is defined
 
     - name: Get SMAX token
       uri:
@@ -66,10 +57,12 @@
         status_code: 200
         validate_certs: no
       register: smax_token_response
+      when: smax_token_url is defined and smax_user is defined and smax_pass is defined
 
     - name: Extract token
       set_fact:
         smax_token: "{{ (smax_token_response.content | from_json).token }}"
+      when: smax_token_response is defined
 
     - name: Send each chunk to SMAX
       vars:
@@ -115,6 +108,7 @@
         index_var: idx
         label: "chunk_{{ idx }}"
       register: smax_responses
+      when: device_chunks is defined and smax_token is defined
 
     - name: Show SMAX responses
       debug:
@@ -123,3 +117,4 @@
       loop_control:
         index_var: rsp_idx
         label: "response_{{ rsp_idx }}"
+      when: smax_responses is defined
