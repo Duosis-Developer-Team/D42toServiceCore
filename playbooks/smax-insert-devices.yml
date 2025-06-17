@@ -5,8 +5,8 @@
   gather_facts: false
 
   vars:
-    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars input
-    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars input
+    device42_api_url: "{{ device42_api_url | default('') }}"  # AWX Extra Vars input
+    device42_auth_header: "{{ device42_auth_header | default('') }}"  # AWX Extra Vars input
     smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars input
     smax_user: "{{ smax_user }}"            # AWX Extra Vars input
     smax_pass: "{{ smax_pass }}"            # AWX Extra Vars input
@@ -14,6 +14,24 @@
     chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
 
   tasks:
+    - name: Validate required variables
+      fail:
+        msg: "Required variable '{{ item }}' is not defined. Please provide it in AWX Extra Vars."
+      when: 
+        - item == 'device42_api_url' and device42_api_url == ''
+        - item == 'device42_auth_header' and device42_auth_header == ''
+        - item == 'smax_token_url' and smax_token_url is not defined
+        - item == 'smax_user' and smax_user is not defined
+        - item == 'smax_pass' and smax_pass is not defined
+        - item == 'smax_api_url' and smax_api_url is not defined
+      loop:
+        - device42_api_url
+        - device42_auth_header
+        - smax_token_url
+        - smax_user
+        - smax_pass
+        - smax_api_url
+
     - name: Fetch devices from Device42
       uri:
         url: "{{ device42_api_url }}"
