@@ -4,15 +4,6 @@
   hosts: localhost
   gather_facts: false
 
-  vars:
-    device42_api_url: "{{ device42_api_url | default('') }}"  # AWX Extra Vars input
-    device42_auth_header: "{{ device42_auth_header | default('') }}"  # AWX Extra Vars input
-    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars input
-    smax_user: "{{ smax_user }}"            # AWX Extra Vars input
-    smax_pass: "{{ smax_pass }}"            # AWX Extra Vars input
-    smax_api_url: "{{ smax_api_url }}"      # AWX Extra Vars input
-    chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
-
   tasks:
     - name: Fetch devices from Device42
       uri:
@@ -24,12 +15,12 @@
         status_code: 200
         validate_certs: no
       register: device42_response
-      when: device42_api_url != '' and device42_auth_header != ''
+      when: device42_api_url is defined and device42_auth_header is defined
 
     - name: Fail if Device42 variables are not provided
       fail:
         msg: "device42_api_url and device42_auth_header must be provided in AWX Extra Vars"
-      when: device42_api_url == '' or device42_auth_header == ''
+      when: device42_api_url is not defined or device42_auth_header is not defined
 
     - name: Extract device list
       set_fact:
@@ -38,7 +29,7 @@
 
     - name: Split devices into chunks
       set_fact:
-        device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
+        device_chunks: "{{ devices | batch((chunk_size | default(1)) | int, []) }}"
       when: devices is defined
 
     - name: Show number of chunks created
