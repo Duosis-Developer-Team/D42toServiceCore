@@ -57,7 +57,7 @@
 
     - name: Extract token
       set_fact:
-        smax_token: "{{ (smax_token_response.content | from_json).token }}"
+        smax_token: "{{ smax_token_response.content }}"
       when: smax_token_response is defined and smax_token_response.content is defined
       register: token_extraction_result
       ignore_errors: yes
