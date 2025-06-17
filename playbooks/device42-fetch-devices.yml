@@ -43,6 +43,9 @@
     - name: Output devices data for next playbook
       debug:
         msg: "Devices data ready for SMAX integration"
+
+    - name: Display devices data
+      debug:
         var: devices
       when: devices is defined
 
