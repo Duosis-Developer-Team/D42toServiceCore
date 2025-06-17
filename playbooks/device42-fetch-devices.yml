@@ -1,5 +1,5 @@
 ---
-- name: Fetch Device42 devices and save to file
+- name: Fetch Device42 devices and prepare for SMAX
   hosts: localhost
   gather_facts: false
 
@@ -7,7 +7,6 @@
     device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars input
     device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars input
     chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
-    devices_file_path: "{{ devices_file_path | default('./device42_devices.json') }}"  # AWX Extra Vars input
 
   tasks:
     - name: Fetch devices from Device42
@@ -29,11 +28,6 @@
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
 
-    - name: Save devices to file
-      copy:
-        content: "{{ devices | to_nice_json }}"
-        dest: "{{ devices_file_path }}"
-
     - name: Show number of chunks created
       debug:
         msg: "{{ device_chunks | length }} chunks created."
@@ -46,6 +40,16 @@
         index_var: idx
         label: "devices_chunk_{{ idx+1 }}"
 
-    - name: Show file location
+    - name: Output devices data for next playbook
       debug:
-        msg: "Devices saved to: {{ devices_file_path }}" 
+        msg: "Devices data ready for SMAX integration"
+        var: devices
+      when: devices is defined
+
+    - name: Set fact for devices count
+      set_fact:
+        total_devices: "{{ devices | length }}"
+
+    - name: Show summary
+      debug:
+        msg: "Total {{ total_devices }} devices fetched from Device42 and ready for SMAX integration" 
