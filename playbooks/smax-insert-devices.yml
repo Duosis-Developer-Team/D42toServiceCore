@@ -95,7 +95,8 @@
                   "SerialNo": "{{ device.serial_no | default('') }}",
                   "OSName": "{{ device.os | default('') }}",
                   "OSVersion": "{{ device.osver | default('') }}",
-                  "Category": "{{ device.category | default('') }}"
+                  "Category": "{{ device.category | default('') }}",
+                  "D42id_c": "{{ device.device_id | default(device.id) | default('') }}"
                 }
               }{% if not loop.last %},{% endif %}
               {% endfor %}
