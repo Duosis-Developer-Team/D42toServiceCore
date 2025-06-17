@@ -50,10 +50,27 @@
       register: smax_token_response
       when: smax_token_url is defined and smax_user is defined and smax_pass is defined
 
+    - name: Show SMAX token response for debugging
+      debug:
+        var: smax_token_response
+      when: smax_token_response is defined
+
     - name: Extract token
       set_fact:
         smax_token: "{{ (smax_token_response.content | from_json).token }}"
-      when: smax_token_response is defined
+      when: smax_token_response is defined and smax_token_response.content is defined
+      register: token_extraction_result
+      ignore_errors: yes
+
+    - name: Show token extraction result
+      debug:
+        var: token_extraction_result
+      when: token_extraction_result is defined
+
+    - name: Fail if token extraction failed
+      fail:
+        msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
+      when: token_extraction_result is failed
 
     - name: Send each chunk to SMAX
       vars:
