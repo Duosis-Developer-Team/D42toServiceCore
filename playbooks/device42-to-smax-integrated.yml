@@ -1,40 +1,48 @@
-# send-to-smax.yaml
 ---
-- name: Insert Device42 devices into SMAX
+- name: Fetch Device42 devices and send directly to SMAX
   hosts: localhost
   gather_facts: false
 
   vars:
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars input
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars input
     smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars input
     smax_user: "{{ smax_user }}"            # AWX Extra Vars input
     smax_pass: "{{ smax_pass }}"            # AWX Extra Vars input
     smax_api_url: "{{ smax_api_url }}"      # AWX Extra Vars input
     chunk_size: "{{ chunk_size | default(1) }}"  # AWX Extra Vars input, default 1
-    devices_file_path: "{{ devices_file_path | default('./device42_devices.json') }}"  # AWX Extra Vars input
 
   tasks:
-    - name: Check if devices file exists
-      stat:
-        path: "{{ devices_file_path }}"
-      register: devices_file_stat
+    - name: Fetch devices from Device42
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        headers:
+          Authorization: "{{ device42_auth_header }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: device42_response
 
-    - name: Fail if devices file not found
-      fail:
-        msg: "Device42 devices file not found at {{ devices_file_path }}. Please run device42-fetch-devices.yml first."
-      when: not devices_file_stat.stat.exists
-
-    - name: Read Device42 devices from file
-      slurp:
-        src: "{{ devices_file_path }}"
-      register: devices_file
-
-    - name: Parse JSON
+    - name: Extract device list
       set_fact:
-        devices: "{{ devices_file.content | b64decode | from_json }}"
+        devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
 
     - name: Split devices into chunks
       set_fact:
         device_chunks: "{{ devices | batch(chunk_size | int, []) }}"
+
+    - name: Display each chunk
+      debug:
+        var: item
+      loop: "{{ device_chunks }}"
+      loop_control:
+        index_var: idx
+        label: "devices_chunk_{{ idx+1 }}"
+
+    - name: Show number of chunks created
+      debug:
+        msg: "{{ device_chunks | length }} chunks created."
 
     - name: Get SMAX token
       uri:
@@ -103,4 +111,4 @@
       loop: "{{ smax_responses.results }}"
       loop_control:
         index_var: rsp_idx
-        label: "response_{{ rsp_idx }}"
+        label: "response_{{ rsp_idx }}" 
