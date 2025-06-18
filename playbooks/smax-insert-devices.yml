@@ -75,9 +75,8 @@
               properties:
                 SubType: "Server"
                 MemorySize: "{{ item.ram | default(0) }}"
-                AssetTag: "{{ item.asset_no | default(item.serial_no) | default('D42_' + (item.device_id | default(item.id) | string)) }}"
+                AssetTag: "{{ item.asset_no | default('D42_' + (item.device_id | default(item.id) | string)) }}"
                 BiosSerialNumber: "{{ item.serial_no | default('') }}"
-                Cpus: "{\"Cpu\":[{\"CpuType\":\"\",\"CpuVendor\":\"\",\"CpuClockSpeed\":\"\",\"CpuId\":\"\",\"CpuCoreNumber\":\"{{ item.cpucount | default(0) }}\"}]}"
                 HostName: "{{ item.name | default('') }}"
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
                 OsName: "{{ item.os | default('') }}"
@@ -114,3 +113,12 @@
         msg: "Response for chunk {{ item.0 }}: {{ item.1.json | default(item.1.content) }}"
       loop: "{{ smax_responses.results | subelements('results') }}"
       when: smax_responses is defined
+
+    - name: Debug payload being sent
+      debug:
+        msg: "Payload for device {{ item.name }}: {{ device_payload | to_json }}"
+      loop: "{{ devices }}"
+      loop_control:
+        index_var: idx
+        label: "debug_payload_{{ idx }}"
+      when: devices is defined
