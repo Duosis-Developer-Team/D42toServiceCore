@@ -92,3 +92,62 @@
         index_var: rsp_idx
         label: "summary_{{ rsp_idx }}"
       when: smax_responses is defined
+
+    - name: Show detailed SMAX response for failed devices
+      debug:
+        msg: |
+          ===== FAILED DEVICE DETAILS =====
+          Device Name: {{ item.item.name }}
+          Device ID: {{ item.item.device_id | default(item.item.id) }}
+          Status Code: {{ item.status }}
+          Full Response: {{ item.json | to_nice_json }}
+          ================================
+      loop: "{{ smax_responses.results }}"
+      when: 
+        - smax_responses is defined
+        - item.json.meta.completion_status is defined
+        - item.json.meta.completion_status == "FAILED"
+      loop_control:
+        index_var: failed_idx
+        label: "failed_device_{{ failed_idx }}"
+
+    - name: Show payload sent for failed devices
+      debug:
+        msg: |
+          ===== PAYLOAD SENT FOR FAILED DEVICE =====
+          Device Name: {{ item.item.name }}
+          Payload: {{ item.item.payload | default('No payload found') | to_nice_json }}
+          =========================================
+      loop: "{{ smax_responses.results }}"
+      when: 
+        - smax_responses is defined
+        - item.json.meta.completion_status is defined
+        - item.json.meta.completion_status == "FAILED"
+      loop_control:
+        index_var: payload_idx
+        label: "payload_{{ payload_idx }}"
+
+    - name: Show successful devices count
+      debug:
+        msg: "Successfully created {{ smax_responses.results | selectattr('json.meta.completion_status', 'equalto', 'OK') | list | length }} devices out of {{ smax_responses.results | length }} total devices"
+      when: smax_responses is defined
+
+    - name: Show failed devices count
+      debug:
+        msg: "Failed to create {{ smax_responses.results | selectattr('json.meta.completion_status', 'equalto', 'FAILED') | list | length }} devices"
+      when: smax_responses is defined
+
+    - name: Show all SMAX response headers for debugging
+      debug:
+        msg: |
+          ===== RESPONSE HEADERS FOR DEVICE {{ item.item.name }} =====
+          Headers: {{ item.headers | to_nice_json }}
+          ===========================================
+      loop: "{{ smax_responses.results }}"
+      when: 
+        - smax_responses is defined
+        - item.json.meta.completion_status is defined
+        - item.json.meta.completion_status == "FAILED"
+      loop_control:
+        index_var: header_idx
+        label: "headers_{{ header_idx }}"
