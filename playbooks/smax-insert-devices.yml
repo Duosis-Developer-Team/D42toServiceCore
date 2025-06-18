@@ -40,11 +40,6 @@
       register: smax_token_response
       when: smax_token_url is defined and smax_user is defined and smax_pass is defined
 
-    - name: Show SMAX token response for debugging
-      debug:
-        var: smax_token_response
-      when: smax_token_response is defined
-
     - name: Extract token
       set_fact:
         smax_token: "{{ smax_token_response.content }}"
@@ -52,20 +47,10 @@
       register: token_extraction_result
       ignore_errors: yes
 
-    - name: Show token extraction result
-      debug:
-        var: token_extraction_result
-      when: token_extraction_result is defined
-
     - name: Fail if token extraction failed
       fail:
         msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
       when: token_extraction_result is failed
-
-    - name: Show current payload for debugging
-      debug:
-        var: device_payload
-      when: device_payload is defined
 
     - name: Send each device to SMAX
       vars:
@@ -74,7 +59,7 @@
             - entity_type: "Device"
               properties:
                 SubType: "Server"
-                MemorySize: "{{ item.ram | default(0) }}"
+                MemorySize: {{ item.ram | default(0) }}
                 AssetTag: "{{ item.asset_no | default('D42_' + (item.device_id | default(item.id) | string)) }}"
                 BiosSerialNumber: "{{ item.serial_no | default('') }}"
                 HostName: "{{ item.name | default('') }}"
@@ -99,26 +84,11 @@
       register: smax_responses
       when: devices is defined and smax_token is defined
 
-    - name: Show SMAX responses
+    - name: Show SMAX response summary
       debug:
-        var: item
+        msg: "Device {{ item.item.name }} - Status: {{ item.status }} - Success: {{ item.json.meta.completion_status if item.json.meta is defined else 'Unknown' }}"
       loop: "{{ smax_responses.results }}"
       loop_control:
         index_var: rsp_idx
-        label: "response_{{ rsp_idx }}"
+        label: "summary_{{ rsp_idx }}"
       when: smax_responses is defined
-
-    - name: Show SMAX response content
-      debug:
-        msg: "Response for chunk {{ item.0 }}: {{ item.1.json | default(item.1.content) }}"
-      loop: "{{ smax_responses.results | subelements('results') }}"
-      when: smax_responses is defined
-
-    - name: Debug payload being sent
-      debug:
-        msg: "Payload for device {{ item.name }}: {{ device_payload | to_json }}"
-      loop: "{{ devices }}"
-      loop_control:
-        index_var: idx
-        label: "debug_payload_{{ idx }}"
-      when: devices is defined
