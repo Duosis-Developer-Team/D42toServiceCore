@@ -62,19 +62,27 @@
         msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
       when: token_extraction_result is failed
 
+    - name: Show current payload for debugging
+      debug:
+        var: device_payload
+      when: device_payload is defined
+
     - name: Send each device to SMAX
       vars:
         device_payload:
-          entity_type: "Device"
-          properties:
-            HostName: "{{ item.name | default('') }}"
-            MemorySize: "{{ item.ram | default(0) }}"
-            AssetTag: "{{ item.asset_no | default('') }}"
-            SerialNo: "{{ item.serial_no | default('') }}"
-            OSName: "{{ item.os | default('') }}"
-            OSVersion: "{{ item.osver | default('') }}"
-            Category: "{{ item.category | default('') }}"
-            D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+          entities:
+            - entity_type: "Device"
+              properties:
+                SubType: "Server"
+                MemorySize: "{{ item.ram | default(0) }}"
+                AssetTag: "{{ item.asset_no | default(item.serial_no) | default('D42_' + (item.device_id | default(item.id) | string)) }}"
+                Cpus: "{\"Cpu\":[{\"CpuType\":\"\",\"CpuVendor\":\"\",\"CpuClockSpeed\":\"\",\"CpuId\":\"\",\"CpuCoreNumber\":\"{{ item.cpucount | default(0) }}\"}]}"
+                HostName: "{{ item.name | default('') }}"
+                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+                SerialNo: "{{ item.serial_no | default('') }}"
+                OSName: "{{ item.os | default('') }}"
+                Category: "{{ item.category | default('') }}"
+          operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
         method: POST
