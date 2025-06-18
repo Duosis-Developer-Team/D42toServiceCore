@@ -27,16 +27,6 @@
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
       when: device42_response is defined
 
-    - name: Split devices into chunks
-      set_fact:
-        device_chunks: "{{ devices | batch((chunk_size | default(1)) | int, []) }}"
-      when: devices is defined
-
-    - name: Show number of chunks created
-      debug:
-        msg: "{{ device_chunks | length }} chunks created for SMAX processing."
-      when: device_chunks is defined
-
     - name: Get SMAX token
       uri:
         url: "{{ smax_token_url }}"
@@ -72,45 +62,36 @@
         msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
       when: token_extraction_result is failed
 
-    - name: Send each chunk to SMAX
+    - name: Send each device to SMAX
       vars:
-        smax_payload: |
-          {
-            "entities": [
-              {% for device in item %}
-              {
-                "entity_type": "Device",
-                "properties": {
-                  "HostName": "{{ device.name | default('') }}",
-                  "MemorySize": {{ device.ram | default(0) }},
-                  "AssetTag": "{{ device.asset_no | default('') }}",
-                  "SerialNo": "{{ device.serial_no | default('') }}",
-                  "OSName": "{{ device.os | default('') }}",
-                  "OSVersion": "{{ device.osver | default('') }}",
-                  "Category": "{{ device.category | default('') }}",
-                  "D42id_c": "{{ device.device_id | default(device.id) | default('') }}"
-                }
-              }{% if not loop.last %},{% endif %}
-              {% endfor %}
-            ],
-            "operation": "CREATE"
-          }
+        device_payload:
+          entity_type: "Device"
+          properties:
+            HostName: "{{ item.name | default('') }}"
+            MemorySize: {{ item.ram | default(0) }}
+            AssetTag: "{{ item.asset_no | default('') }}"
+            SerialNo: "{{ item.serial_no | default('') }}"
+            OSName: "{{ item.os | default('') }}"
+            OSVersion: "{{ item.osver | default('') }}"
+            Category: "{{ item.category | default('') }}"
+            D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
       uri:
         url: "{{ smax_api_url }}"
         method: POST
         headers:
           Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
           Content-Type: "application/json"
-        body: "{{ smax_payload }}"
+        body: "{{ device_payload | to_json }}"
+        body_format: raw
         status_code: 200,201,202
         validate_certs: no
         return_content: yes
-      loop: "{{ device_chunks }}"
+      loop: "{{ devices }}"
       loop_control:
         index_var: idx
-        label: "chunk_{{ idx }}"
+        label: "device_{{ idx }}"
       register: smax_responses
-      when: device_chunks is defined and smax_token is defined
+      when: devices is defined and smax_token is defined
 
     - name: Show SMAX responses
       debug:
