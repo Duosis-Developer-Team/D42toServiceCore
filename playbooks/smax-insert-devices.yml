@@ -59,7 +59,7 @@
             - entity_type: "Device"
               properties:
                 SubType: "Server"
-                MemorySize: {{ (item.ram | default(0)) | int }}
+                MemorySize: "{{ (item.ram | default(0)) | int }}"
                 AssetTag: "{{ item.asset_no | default('D42_' + (item.device_id | default(item.id) | string)) }}"
                 BiosSerialNumber: "{{ item.serial_no | default('') }}"
                 HostName: "{{ item.name | default('') }}"
