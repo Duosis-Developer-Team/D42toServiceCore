@@ -68,7 +68,7 @@
           entity_type: "Device"
           properties:
             HostName: "{{ item.name | default('') }}"
-            MemorySize: {{ item.ram | default(0) }}
+            MemorySize: "{{ item.ram | default(0) }}"
             AssetTag: "{{ item.asset_no | default('') }}"
             SerialNo: "{{ item.serial_no | default('') }}"
             OSName: "{{ item.os | default('') }}"
