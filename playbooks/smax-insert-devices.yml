@@ -81,7 +81,6 @@
                 HostName: "{{ item.name | default('') }}"
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
                 OsName: "{{ item.os | default('') }}"
-                Category: "{{ item.category | default('') }}"
           operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
