@@ -76,11 +76,11 @@
                 SubType: "Server"
                 MemorySize: "{{ item.ram | default(0) }}"
                 AssetTag: "{{ item.asset_no | default(item.serial_no) | default('D42_' + (item.device_id | default(item.id) | string)) }}"
+                BiosSerialNumber: "{{ item.serial_no | default('') }}"
                 Cpus: "{\"Cpu\":[{\"CpuType\":\"\",\"CpuVendor\":\"\",\"CpuClockSpeed\":\"\",\"CpuId\":\"\",\"CpuCoreNumber\":\"{{ item.cpucount | default(0) }}\"}]}"
                 HostName: "{{ item.name | default('') }}"
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
-                SerialNo: "{{ item.serial_no | default('') }}"
-                OSName: "{{ item.os | default('') }}"
+                OsName: "{{ item.os | default('') }}"
                 Category: "{{ item.category | default('') }}"
           operation: "CREATE"
       uri:
