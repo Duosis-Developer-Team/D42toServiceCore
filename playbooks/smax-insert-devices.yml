@@ -91,9 +91,6 @@
                 # Disk Information
                 DiskDevices: "{{ {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Additional properties
-                Manufacturer: "{{ item.manufacturer | default('') }}"
-                Model: "{{ item.model | default('') }}"
-                Location: "{{ item.location | default('') }}"
                 Status: "{{ item.status | default('In Service') }}"
           operation: "CREATE"
       uri:
@@ -176,7 +173,7 @@
       debug:
         msg: |
           ===== RESPONSE HEADERS FOR DEVICE {{ item.item.name }} =====
-          Headers: {{ item.headers | to_nice_json }}
+          Headers: {{ item.headers | default('Yok') | to_nice_json }}
           ===========================================
       loop: "{{ smax_responses.results }}"
       when: 
