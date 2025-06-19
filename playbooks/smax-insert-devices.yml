@@ -4,10 +4,19 @@
   hosts: localhost
   gather_facts: false
 
+  vars:
+    limit: "{{ limit | default(omit) }}"  # Opsiyonel limit değişkeni
+
+  pre_tasks:
+    - name: Build Device42 API URL with optional limit
+      set_fact:
+        device42_final_url: >-
+          {{ device42_api_url }}{% if limit is defined and limit is not none and limit != '' %}?limit={{ limit }}{% endif %}
+
   tasks:
     - name: Fetch devices from Device42
       uri:
-        url: "{{ device42_api_url }}"
+        url: "{{ device42_final_url }}"
         method: GET
         headers:
           Authorization: "{{ device42_auth_header }}"
