@@ -13,7 +13,7 @@
     - name: Build Device42 API URL with optional limit
       set_fact:
         device42_final_url: >-
-          {{ device42_api_url }}{% if limit is defined %}?limit={{ limit }}{% endif %}
+          {{ device42_api_url }}{% if limit is defined and limit|length > 0 %}?limit={{ limit }}{% endif %}
 
   tasks:
     - name: Fetch devices from Device42
