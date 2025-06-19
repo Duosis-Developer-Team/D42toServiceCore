@@ -5,27 +5,10 @@
   gather_facts: false
 
   tasks:
-    - name: Fetch devices from Device42
-      uri:
-        url: "{{ device42_api_url }}"
-        method: GET
-        headers:
-          Authorization: "{{ device42_auth_header }}"
-        return_content: yes
-        status_code: 200
-        validate_certs: no
-      register: device42_response
-      when: device42_api_url is defined and device42_auth_header is defined
-
-    - name: Fail if Device42 variables are not provided
+    - name: Fail if devices variable is not provided
       fail:
-        msg: "device42_api_url and device42_auth_header must be provided in AWX Extra Vars"
-      when: device42_api_url is not defined or device42_auth_header is not defined
-
-    - name: Extract device list
-      set_fact:
-        devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
-      when: device42_response is defined
+        msg: "devices değişkeni playbook'a input olarak verilmelidir. (Ör: 'devices: [...]')"
+      when: devices is not defined
 
     - name: Process device data and add IP information
       set_fact:
