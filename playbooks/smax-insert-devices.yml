@@ -27,6 +27,16 @@
         devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
       when: device42_response is defined
 
+    - name: Process device data and add IP information
+      set_fact:
+        processed_devices: "{{ devices | map('combine', {'processed_ips': item.ip_addresses | default([]) + [item.ip_address | default('')] + [item.primary_ip | default('')] | select('string') | list | unique}) }}"
+      when: devices is defined
+
+    - name: Show sample processed device data
+      debug:
+        var: processed_devices[0:3]
+      when: processed_devices is defined
+
     - name: Get SMAX token
       uri:
         url: "{{ smax_token_url }}"
@@ -65,6 +75,60 @@
                 HostName: "{{ item.name | default('') }}"
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
                 OsName: "{{ item.os | default('') }}"
+                # IP Addresses - SMAX formatına uygun şekilde dönüştür
+                IpAddresses: "{{ {'IpAddress': item.ip_addresses | default([]) | map('extract', {
+                  'IpValue': 'ip',
+                  'IpType': 'type',
+                  'AuthoritativeDNSName': 'dns_name',
+                  'RoutingDomain': 'routing_domain',
+                  'GlobalId': 'global_id',
+                  'Keep': 'keep',
+                  'Id': 'id'
+                }) | map('combine', {
+                  'IpValue': '',
+                  'IpType': '',
+                  'AuthoritativeDNSName': '',
+                  'RoutingDomain': '',
+                  'GlobalId': '',
+                  'Keep': '',
+                  'Id': ''
+                }) | list }}"
+                # CPU Information - SMAX formatına uygun şekilde dönüştür
+                Cpus: "{{ {'Cpu': [ {
+                  'CpuClockSpeed': (item.cpuspeed | default('')) | string,
+                  'CpuCoreNumber': (item.cpucore | default('')) | string,
+                  'CpuType': '',
+                  'CpuVendor': '',
+                  'CpuId': '',
+                  'GlobalId': '',
+                  'Keep': '',
+                  'Id': ''
+                } ] } | to_json }}"
+                # Disk Information - SMAX formatına uygun şekilde dönüştür
+                DiskDevices: "{{ {'DiskDevice': item.hdd_details | default([]) | map('extract', {
+                  'DiskName': 'hdd.description',
+                  'DiskSize': 'hdd.size',
+                  'DiskModelName': 'hdd.description',
+                  'DiskVendor': 'hdd.manufacturer_id',
+                  'DiskType': 'hdd.type',
+                  'GlobalId': 'hdd.global_id',
+                  'Keep': 'hdd.keep',
+                  'Id': 'hdd.hd_id'
+                }) | map('combine', {
+                  'DiskName': '',
+                  'DiskSize': '',
+                  'DiskModelName': '',
+                  'DiskVendor': '',
+                  'DiskType': '',
+                  'GlobalId': '',
+                  'Keep': '',
+                  'Id': ''
+                }) | list } | to_json }}"
+                # Additional properties
+                Manufacturer: "{{ item.manufacturer | default('') }}"
+                Model: "{{ item.model | default('') }}"
+                Location: "{{ item.location | default('') }}"
+                Status: "{{ item.status | default('In Service') }}"
           operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
@@ -77,12 +141,12 @@
         status_code: 200,201,202
         validate_certs: no
         return_content: yes
-      loop: "{{ devices }}"
+      loop: "{{ processed_devices }}"
       loop_control:
         index_var: idx
         label: "device_{{ idx }}"
       register: smax_responses
-      when: devices is defined and smax_token is defined
+      when: processed_devices is defined and smax_token is defined
 
     - name: Show SMAX response summary
       debug:
@@ -136,6 +200,11 @@
       debug:
         msg: "Failed to create {{ smax_responses.results | selectattr('json.meta.completion_status', 'equalto', 'FAILED') | list | length }} devices"
       when: smax_responses is defined
+
+    - name: Show device processing summary
+      debug:
+        msg: "Processed {{ processed_devices | length }} devices with IP information for SMAX integration"
+      when: processed_devices is defined
 
     - name: Show all SMAX response headers for debugging
       debug:
