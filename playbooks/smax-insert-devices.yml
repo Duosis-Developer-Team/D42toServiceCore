@@ -62,91 +62,74 @@
         msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
       when: token_extraction_result is failed
 
-    - name: Send each device to SMAX
-      vars:
-        device_payload:
-          entities:
-            - entity_type: "Device"
-              properties:
-                SubType: "Server"
-                MemorySize: "{{ (item.ram | default(0)) | int }}"
-#                AssetTag: "{{ item.asset_no | default('D42_' + (item.device_id | default(item.id) | string)) }}"
-                BiosSerialNumber: "{{ item.serial_no | default('') }}"
-                HostName: "{{ item.name | default('') }}"
-                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
-                OsName: "{{ item.os | default('') }}"
-                # IP Addresses - SMAX formatına uygun şekilde dönüştür
-                IpAddresses: "{{ {'IpAddress': item.ip_addresses | default([]) | map('extract', {
-                  'IpValue': 'ip',
-                  'IpType': 'type',
-                  'AuthoritativeDNSName': 'dns_name',
-                  'RoutingDomain': 'routing_domain',
-                  'GlobalId': 'global_id',
-                  'Keep': 'keep',
-                  'Id': 'id'
-                }) | map('combine', {
-                  'IpValue': '',
-                  'IpType': '',
-                  'AuthoritativeDNSName': '',
-                  'RoutingDomain': '',
-                  'GlobalId': '',
-                  'Keep': '',
-                  'Id': ''
-                }) | list }}"
-                # CPU Information - SMAX formatına uygun şekilde dönüştür
-                Cpus: "{{ {'Cpu': [ {
-                  'CpuClockSpeed': (item.cpuspeed | default('')) | string,
-                  'CpuCoreNumber': (item.cpucore | default('')) | string,
-                  'CpuType': '',
-                  'CpuVendor': '',
-                  'CpuId': '',
-                  'GlobalId': '',
-                  'Keep': '',
-                  'Id': ''
-                } ] } | to_json }}"
-                # Disk Information - SMAX formatına uygun şekilde dönüştür
-                DiskDevices: "{{ {'DiskDevice': item.hdd_details | default([]) | map('extract', {
-                  'DiskName': 'hdd.description',
-                  'DiskSize': 'hdd.size',
-                  'DiskModelName': 'hdd.description',
-                  'DiskVendor': 'hdd.manufacturer_id',
-                  'DiskType': 'hdd.type',
-                  'GlobalId': 'hdd.global_id',
-                  'Keep': 'hdd.keep',
-                  'Id': 'hdd.hd_id'
-                }) | map('combine', {
-                  'DiskName': '',
-                  'DiskSize': '',
-                  'DiskModelName': '',
-                  'DiskVendor': '',
-                  'DiskType': '',
-                  'GlobalId': '',
-                  'Keep': '',
-                  'Id': ''
-                }) | list } | to_json }}"
-                # Additional properties
-                Manufacturer: "{{ item.manufacturer | default('') }}"
-                Model: "{{ item.model | default('') }}"
-                Location: "{{ item.location | default('') }}"
-                Status: "{{ item.status | default('In Service') }}"
-          operation: "CREATE"
-      uri:
-        url: "{{ smax_api_url }}"
-        method: POST
-        headers:
-          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
-          Content-Type: "application/json"
-        body: "{{ device_payload | to_json }}"
-        body_format: raw
-        status_code: 200,201,202
-        validate_certs: no
-        return_content: yes
-      loop: "{{ processed_devices }}"
+    - name: Prepare SMAX IpAddresses string
+      set_fact:
+        smax_ipaddresses: >-
+          {{ {'IpAddress': item.ip_addresses | default([]) | map('community.general.json_query', '{
+            IpValue: ip || ``,
+            IpType: type || ``,
+            AuthoritativeDNSName: dns_name || ``,
+            RoutingDomain: routing_domain || ``,
+            GlobalId: global_id || ``,
+            Keep: keep || ``,
+            Id: id || ``
+          }') | list } | to_json }}
+      loop: "{{ devices }}"
       loop_control:
+        loop_var: item
         index_var: idx
-        label: "device_{{ idx }}"
-      register: smax_responses
-      when: processed_devices is defined and smax_token is defined
+        label: "ipaddresses_{{ idx }}"
+      register: smax_ipaddresses_list
+
+    - name: Prepare SMAX Cpus string
+      set_fact:
+        smax_cpus: >-
+          {{ {'Cpu': [ {
+            'CpuClockSpeed': (item.cpuspeed | default('')) | string,
+            'CpuCoreNumber': (item.cpucore | default('')) | string,
+            'CpuType': '',
+            'CpuVendor': '',
+            'CpuId': '',
+            'GlobalId': '',
+            'Keep': '',
+            'Id': ''
+          } ] } | to_json }}
+      loop: "{{ devices }}"
+      loop_control:
+        loop_var: item
+        index_var: idx
+        label: "cpus_{{ idx }}"
+      register: smax_cpus_list
+
+    - name: Prepare SMAX DiskDevices string
+      set_fact:
+        smax_diskdevices: >-
+          {{ {'DiskDevice': item.hdd_details | default([]) | map('community.general.json_query', '{
+            DiskName: hdd.description || ``,
+            DiskSize: hdd.size || ``,
+            DiskModelName: hdd.description || ``,
+            DiskVendor: hdd.manufacturer_id || ``,
+            DiskType: hdd.type || ``,
+            GlobalId: hdd.global_id || ``,
+            Keep: hdd.keep || ``,
+            Id: hdd.hd_id || ``
+          }') | list } | to_json }}
+      loop: "{{ devices }}"
+      loop_control:
+        loop_var: item
+        index_var: idx
+        label: "diskdevices_{{ idx }}"
+      register: smax_diskdevices_list
+
+    - name: Merge processed devices with SMAX fields
+      set_fact:
+        processed_devices: >-
+          {{ processed_devices | zip_longest(
+            smax_ipaddresses_list.results | map(attribute='ansible_facts.smax_ipaddresses') | list,
+            smax_cpus_list.results | map(attribute='ansible_facts.smax_cpus') | list,
+            smax_diskdevices_list.results | map(attribute='ansible_facts.smax_diskdevices') | list
+          ) | map('combine', ['item', {'IpAddresses': 'item1', 'Cpus': 'item2', 'DiskDevices': 'item3'}]) | list }}
+      when: processed_devices is defined and smax_ipaddresses_list is defined and smax_cpus_list is defined and smax_diskdevices_list is defined
 
     - name: Show SMAX response summary
       debug:
