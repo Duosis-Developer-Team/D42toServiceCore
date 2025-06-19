@@ -91,7 +91,7 @@
                 # Disk Information
                 DiskDevices: "{{ {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Additional properties
-                Status: "{{ item.status | default('In Service') }}"
+#                Status: "{{ item.status | default('In Service') }}"
           operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
