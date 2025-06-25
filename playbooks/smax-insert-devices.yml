@@ -96,7 +96,14 @@
                 # CPU Information
                 Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
-                DiskDevices: "{{ {'DiskDevice': (item.hdd_details | default([]) | map('combine', {'DiskName': '', 'DiskSize': '', 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list | default([{'DiskName': '', 'DiskSize': item.hdd_size | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}]))} | to_json }}"
+                DiskDevices: >-
+                  {{ {'DiskDevice':
+                    (item.hdd_details is defined and item.hdd_details|length > 0)
+                    | ternary(
+                        item.hdd_details | map('combine', {'DiskName': '', 'DiskSize': '', 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list,
+                        [ {'DiskName': '', 'DiskSize': item.hdd_size | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''} ]
+                      )
+                  } | to_json }}
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
