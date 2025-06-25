@@ -76,36 +76,42 @@
         msg: "cpuspeed: {{ item.cpuspeed }}, cpu_speed: {{ item.cpu_speed }}, mac_addresses: {{ item.mac_addresses }}"
       when: item is defined
 
+    - name: Build SMAX properties
+      set_fact:
+        smax_properties: >-
+          {{
+            {
+              'SubType': 'Server',
+              'MemorySize': (item.ram | default(0)) | int,
+              'BiosSerialNumber': item.serial_no | default(''),
+              'BiosUUID': item.uuid | default(''),
+              'HostName': item.name | default(''),
+              'D42id_c': item.device_id | default(item.id) | default(''),
+              'OsName': item.os | default(''),
+              'IpAddresses': {'IpAddress': [ { 'IpValue': (item.processed_ips | default([]) | select('string') | list)[0] | default(item.ip_address | default(item.primary_ip | default(''))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json,
+              'Cpus': {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json,
+              'DiskDevices': {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json,
+              'Vendor': item.manufacturer | default(''),
+              'Model': item.hw_model | default(''),
+              'Environment': item.service_level | default('')
+            }
+            | combine(
+                (item.mac_addresses is defined and item.mac_addresses|length > 0)
+                | ternary(
+                    {'NetworkCards': '[{% for mac in item.mac_addresses %}{"MacAddress": "{{ mac.mac | default("") }}", "Name": "{{ mac.port_name | default("") }}"}{% if not loop.last %},{% endif %}{% endfor %}]'},
+                    {}
+                )
+            )
+          }}
+      when: item is defined
+
     - name: Send each device to SMAX
       vars:
         device_payload:
           entities:
             - entity_type: "Device"
               properties:
-                SubType: "Server"
-                MemorySize: "{{ (item.ram | default(0)) | int }}"
-#                Memory: "{{ item.ram | default(item.memory | default(0)) }}"
-#                AssetTag: "{{ item.asset_no | default('D42_' + (item.device_id | default(item.id) | string)) }}"
-                BiosSerialNumber: "{{ item.serial_no | default('') }}"
-                BiosUUID: "{{ item.uuid | default('') }}"
-                HostName: "{{ item.name | default('') }}"
-                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
-                OsName: "{{ item.os | default('') }}"
-                # IP Addresses - use first available IP
-                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.processed_ips | default([]) | select('string') | list)[0] | default(item.ip_address | default(item.primary_ip | default(''))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
-                # CPU Information
-                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
-                # Disk Information
-                DiskDevices: "{{ {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
-                # Additional properties
-#                Status: "{{ item.status | default('In Service') }}"
-                # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
-                Vendor: "{{ item.manufacturer | default('') }}"
-                Model: "{{ item.hw_model | default('') }}"
-                Environment: "{{ item.service_level | default('') }}"
-                {% if item.mac_addresses is defined and item.mac_addresses|length > 0 %}
-                NetworkCards: "[{% for mac in item.mac_addresses %}{\"MacAddress\": \"{{ mac.mac | default('') }}\", \"Name\": \"{{ mac.port_name | default('') }}\"}{% if not loop.last %},{% endif %}{% endfor %}]"
-                {% endif %}
+                properties: "{{ smax_properties }}"
           operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
