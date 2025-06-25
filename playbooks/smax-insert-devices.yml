@@ -94,7 +94,7 @@
                 # IP Addresses - use first available IP
                 IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.processed_ips | default([]) | select('string') | list)[0] | default(item.ip_address | default(item.primary_ip | default(''))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # CPU Information
-                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | string) | default(item.cpu_speed | string | default('')), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
                 DiskDevices: "{{ {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Additional properties
