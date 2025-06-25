@@ -71,6 +71,11 @@
         msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
       when: token_extraction_result is failed
 
+    - name: Show CPU speed and mac_addresses
+      debug:
+        msg: "cpuspeed: {{ item.cpuspeed }}, cpu_speed: {{ item.cpu_speed }}, mac_addresses: {{ item.mac_addresses }}"
+      when: item is defined
+
     - name: Send each device to SMAX
       vars:
         device_payload:
@@ -89,13 +94,13 @@
                 # IP Addresses - use first available IP
                 IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.processed_ips | default([]) | select('string') | list)[0] | default(item.ip_address | default(item.primary_ip | default(''))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # CPU Information
-                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': item.cpuspeed | default(item.cpu_speed | default('')), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | string) | default(item.cpu_speed | string | default('')), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
                 DiskDevices: "{{ {'DiskDevice': [ { 'DiskName': '', 'DiskSize': (item.hdd_size | default(item.disk_size | default(0))) | string, 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
-                NetworkCards: "{{ item.mac_addresses | default([]) | map('combine', [{'MacAddress': item.mac | default('')}, {'Name': item.port_name | default('')}]) | list | to_json }}"
+                NetworkCards: "{{ item.mac_addresses | default([]) | map('extract', ['mac', 'port_name']) | map('combine', [{'MacAddress': '', 'Name': ''}]) | list | to_json }}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
