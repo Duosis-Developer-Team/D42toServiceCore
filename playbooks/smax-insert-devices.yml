@@ -103,7 +103,7 @@
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
-                NetworkCards: [{% for mac in item.mac_addresses | default([]) %}{"MacAddress": "{{ mac.mac | default('') }}", "Name": "{{ mac.port_name | default('') }}"}{% if not loop.last %},{% endif %}{% endfor %}]
+                NetworkCards: "[{% for mac in item.mac_addresses | default([]) %}{\"MacAddress\": \"{{ mac.mac | default('') }}\", \"Name\": \"{{ mac.port_name | default('') }}\"}{% if not loop.last %},{% endif %}{% endfor %}]"
           operation: "CREATE"
       uri:
         url: "{{ smax_api_url }}"
