@@ -101,6 +101,26 @@
       loop: "{{ processed_devices }}"
       when: processed_devices is defined
 
+    - name: Prepare clean network cards for each device
+      set_fact:
+        clean_network_cards: >-
+          {{
+            item.mac_addresses | default([]) | map('extract', 'mac') | map('combine', {
+              'MacAddress': '',
+              'NetworkCardSpeed': '',
+              'NetworkCardName': '',
+              'NetworkCardType': '',
+              'NetworkCardRole': '',
+              'GlobalId': '',
+              'Keep': '',
+              'Id': ''
+            }) | map('combine', {'MacAddress': attribute | default('')}) | list
+          }}
+      loop: "{{ processed_devices }}"
+      loop_control:
+        loop_var: item
+      register: clean_network_cards_results
+
     - name: Send each device to SMAX
       vars:
         device_payload:
@@ -125,7 +145,7 @@
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: A Working payload
-                NetworkCards: "{{ {'NetworkCard': (item.mac_addresses | default([]) | map('combine', {'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': ''}) | map('combine', {'MacAddress': attribute.mac | default('')}) | list ) } | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': clean_network_cards } | to_json }}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
