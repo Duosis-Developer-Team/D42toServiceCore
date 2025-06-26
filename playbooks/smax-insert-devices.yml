@@ -113,31 +113,25 @@
       set_fact:
         clean_network_cards: >-
           {{
-            mac_list | map('regex_replace', '^(.*)$', '{"MacAddress": "\\1", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}') | map('from_json') | list
+            '[\n' + (
+              mac_list | map('to_yaml') | join(',\n')
+            ) + '\n]' | from_yaml
           }}
       vars:
-        mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
+        mac_list: >-
+          [{% for mac in item.mac_addresses | default([]) %}
+            {
+              MacAddress: "{{ mac }}",
+              NetworkCardSpeed: "",
+              NetworkCardName: "",
+              NetworkCardType: "",
+              NetworkCardRole: "",
+              GlobalId: "",
+              Keep: "",
+              Id: ""
+            }{% if not loop.last %},{% endif %}
+          {% endfor %}]
       loop: "{{ devices }}"
-      loop_control:
-        loop_var: item
-      register: clean_network_cards_results
-
-    - name: Prepare clean network cards for each device
-      set_fact:
-        clean_network_cards: >-
-          {{
-            item.mac_addresses | default([]) | map(attribute='mac') | map('combine', {
-              'MacAddress': attribute | default(''),
-              'NetworkCardSpeed': '',
-              'NetworkCardName': '',
-              'NetworkCardType': '',
-              'NetworkCardRole': '',
-              'GlobalId': '',
-              'Keep': '',
-              'Id': ''
-            }) | list
-          }}
-      loop: "{{ processed_devices }}"
       loop_control:
         loop_var: item
       register: clean_network_cards_results
