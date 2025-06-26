@@ -105,16 +105,7 @@
       set_fact:
         clean_network_cards: >-
           {{
-            item.mac_addresses | default([]) | map('combine', {
-              'MacAddress': attribute.mac | default(''),
-              'NetworkCardSpeed': '',
-              'NetworkCardName': '',
-              'NetworkCardType': '',
-              'NetworkCardRole': '',
-              'GlobalId': '',
-              'Keep': '',
-              'Id': ''
-            }) | list
+            (item.mac_addresses | default([]) | map(attribute='mac') | list) | map('regex_replace', '^(.*)$', '{"MacAddress": "\\1", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}') | map('from_json') | list
           }}
       loop: "{{ processed_devices }}"
       loop_control:
