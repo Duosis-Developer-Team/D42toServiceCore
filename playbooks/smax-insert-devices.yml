@@ -125,7 +125,24 @@
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: A Working payload
-                NetworkCards: "{{ {'NetworkCard': (item.mac_addresses | default([]) | map('combine', {'MacAddress': attribute.mac | default(''), 'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list ) } | to_json }}"
+                NetworkCards: >-
+                  {{
+                    {
+                      'NetworkCard': [
+                        {
+                          'MacAddress': mac.mac | default(''),
+                          'NetworkCardSpeed': '',
+                          'NetworkCardName': '',
+                          'NetworkCardType': '',
+                          'NetworkCardRole': '',
+                          'GlobalId': '',
+                          'Keep': '',
+                          'Id': ''
+                        }
+                        for mac in item.mac_addresses | default([])
+                      ]
+                    } | to_json
+                  }}
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
