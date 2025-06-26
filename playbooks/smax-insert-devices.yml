@@ -129,30 +129,6 @@
         loop_var: item
       register: clean_network_cards_results
 
-    - name: Add SMAX network cards to each processed device
-      set_fact:
-        processed_devices: >-
-          {{
-            processed_devices | default([]) + [
-              item | combine({
-                'clean_network_cards': (
-                  item.mac_addresses | default([]) | map(attribute='mac') | map('community.general.dict_kv', 'MacAddress') | map('combine', {
-                    'NetworkCardSpeed': '',
-                    'NetworkCardName': '',
-                    'NetworkCardType': '',
-                    'NetworkCardRole': '',
-                    'GlobalId': '',
-                    'Keep': '',
-                    'Id': ''
-                  }) | list
-                )
-              })
-            ]
-          }}
-      loop: "{{ devices }}"
-      loop_control:
-        loop_var: item
-
     - name: Send each device to SMAX
       vars:
         device_payload:
