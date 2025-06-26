@@ -101,6 +101,25 @@
       loop: "{{ processed_devices }}"
       when: processed_devices is defined
 
+    - name: Extract mac addresses for each device
+      set_fact:
+        mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
+      loop: "{{ processed_devices }}"
+      loop_control:
+        loop_var: item
+      register: mac_list_results
+
+    - name: Build clean network cards for each device
+      set_fact:
+        clean_network_cards: []
+
+    - name: Add each mac as SMAX network card dict
+      set_fact:
+        clean_network_cards: "{{ clean_network_cards + [ { 'MacAddress': mac, 'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] }}"
+      loop: "{{ mac_list }}"
+      loop_control:
+        loop_var: mac
+
     - name: Prepare clean network cards for each device
       set_fact:
         clean_network_cards: >-
