@@ -112,16 +112,24 @@
     - name: Build clean network cards for each device
       set_fact:
         clean_network_cards: >-
+          {% if item.mac_addresses | default([]) | length == 0 %}
+          []
+          {% else %}
           [
           {% for mac in item.mac_addresses | default([]) %}
             {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
           {% endfor %}
           ]
+          {% endif %}
           | from_yaml
       loop: "{{ devices }}"
       loop_control:
         loop_var: item
       register: clean_network_cards_results
+
+    - name: Debug clean_network_cards
+      debug:
+        var: clean_network_cards
 
     - name: Send each device to SMAX
       vars:
