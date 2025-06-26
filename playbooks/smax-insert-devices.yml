@@ -127,13 +127,18 @@
                 # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
                 NetworkCards: >-
                   {{
-                    {'NetworkCard': (('[%s]' % (
-                      ','.join([
-                        '{"MacAddress": "%s", "Name": "%s"}' % (mac.mac | default(''), mac.port_name | default(''))
-                        for mac in item.mac_addresses | default([])
-                      ])
-                    )) | from_json)}
-                    | to_json
+                    {'NetworkCard': (
+                      (
+                        '[' +
+                        (
+                          ','.join([
+                            '{"MacAddress": "' ~ (mac.mac | default('')) ~ '"}'
+                            for mac in item.mac_addresses | default([])
+                          ])
+                        ) +
+                        ']'
+                      ) | from_json
+                    )} | to_json
                     if item.mac_addresses is defined and item.mac_addresses | length > 0
                     else omit
                   }}
