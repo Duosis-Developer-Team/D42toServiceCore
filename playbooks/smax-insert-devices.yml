@@ -111,19 +111,12 @@
 
     - name: Build clean network cards for each device
       set_fact:
-        clean_network_cards: |-
-          [{% for mac in mac_list %}
-            {
-              "MacAddress": "{{ mac }}",
-              "NetworkCardSpeed": "",
-              "NetworkCardName": "",
-              "NetworkCardType": "",
-              "NetworkCardRole": "",
-              "GlobalId": "",
-              "Keep": "",
-              "Id": ""
-            }{% if not loop.last %},{% endif %}
-          {% endfor %}]
+        clean_network_cards: >-
+          {{
+            (
+              '[{% for mac in mac_list %}{"MacAddress": "{{ mac }}", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}{% endfor %}]'
+            ) | from_yaml
+          }}
       loop: "{{ mac_list }}"
       loop_control:
         loop_var: mac
