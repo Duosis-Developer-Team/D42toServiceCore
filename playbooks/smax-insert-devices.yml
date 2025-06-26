@@ -124,7 +124,7 @@
                 DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0) | ternary((item.hdd_details | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
-                # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
+                # NetworkCards: A Working payload
                 NetworkCards: "{\"NetworkCard\":[{\"MacAddress\":\"item.mac_addresses.mac\",\"NetworkCardSpeed\":\"\",\"NetworkCardName\":\"\",\"NetworkCardType\":\"\",\"NetworkCardRole\":\"\",\"GlobalId\":\"\",\"Keep\":\"\",\"Id\":\"\"}]}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
