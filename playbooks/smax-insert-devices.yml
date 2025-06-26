@@ -104,18 +104,26 @@
     - name: Extract mac addresses for each device
       set_fact:
         mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
-      loop: "{{ processed_devices }}"
+      loop: "{{ devices }}"
       loop_control:
         loop_var: item
       register: mac_list_results
 
     - name: Build clean network cards for each device
       set_fact:
-        clean_network_cards: []
-
-    - name: Add each mac as SMAX network card dict
-      set_fact:
-        clean_network_cards: "{{ clean_network_cards + [ { 'MacAddress': mac, 'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] }}"
+        clean_network_cards: |-
+          [{% for mac in mac_list %}
+            {
+              "MacAddress": "{{ mac }}",
+              "NetworkCardSpeed": "",
+              "NetworkCardName": "",
+              "NetworkCardType": "",
+              "NetworkCardRole": "",
+              "GlobalId": "",
+              "Keep": "",
+              "Id": ""
+            }{% if not loop.last %},{% endif %}
+          {% endfor %}]
       loop: "{{ mac_list }}"
       loop_control:
         loop_var: mac
@@ -188,7 +196,7 @@
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: A Working payload
-                NetworkCards: "{{ {'NetworkCard': item.clean_network_cards | default([]) } | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': clean_network_cards } | to_json }}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
