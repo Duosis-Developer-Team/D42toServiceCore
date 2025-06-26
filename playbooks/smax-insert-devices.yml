@@ -97,6 +97,7 @@
           CPU Count: {{ item.cpucount }}
           CPU Core: {{ item.cpucore }}
           CPU Speed: {{ item.cpuspeed }}
+          MAC Addresses: {{ item.mac_addresses }}
       loop: "{{ processed_devices }}"
       when: processed_devices is defined
 
@@ -118,12 +119,13 @@
                 # IP Addresses - use first available IP from ip_addresses array
                 IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # CPU Information
-                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpucore | default(item.cpucount | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
                 DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0) | ternary((item.hdd_details | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
+                NetworkCards: "{{ {'NetworkCard': (item.mac_addresses | default([]) | map('combine', {'MacAddress': item.mac | default(''), 'Name': item.port_name | default('')}) | list) if item.mac_addresses | default([]) | length > 0 else []} | to_json }}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
