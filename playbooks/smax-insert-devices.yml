@@ -125,7 +125,7 @@
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: A Working payload
-                NetworkCards: "{\"NetworkCard\":[{\"MacAddress\":\"{{ item.mac_addresses[0].mac | default('') }}\",\"NetworkCardSpeed\":\"\",\"NetworkCardName\":\"\",\"NetworkCardType\":\"\",\"NetworkCardRole\":\"\",\"GlobalId\":\"\",\"Keep\":\"\",\"Id\":\"\"}]}"
+                NetworkCards: "{\"NetworkCard\":[{\"MacAddress\":\"item.mac_addresses.mac\",\"NetworkCardSpeed\":\"\",\"NetworkCardName\":\"\",\"NetworkCardType\":\"\",\"NetworkCardRole\":\"\",\"GlobalId\":\"\",\"Keep\":\"\",\"Id\":\"\"}]}"
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
