@@ -113,13 +113,14 @@
       set_fact:
         clean_network_cards: >-
           {{
-            (
-              '[{% for mac in mac_list %}{"MacAddress": "{{ mac }}", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}{% endfor %}]'
-            ) | from_yaml
+            mac_list | map('regex_replace', '^(.*)$', '{"MacAddress": "\\1", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}') | map('from_json') | list
           }}
-      loop: "{{ mac_list }}"
+      vars:
+        mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
+      loop: "{{ devices }}"
       loop_control:
-        loop_var: mac
+        loop_var: item
+      register: clean_network_cards_results
 
     - name: Prepare clean network cards for each device
       set_fact:
