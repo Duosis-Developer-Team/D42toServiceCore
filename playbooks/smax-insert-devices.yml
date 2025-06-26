@@ -105,8 +105,8 @@
       set_fact:
         clean_network_cards: >-
           {{
-            item.mac_addresses | default([]) | map('extract', 'mac') | map('combine', {
-              'MacAddress': '',
+            item.mac_addresses | default([]) | map('combine', {
+              'MacAddress': attribute.mac | default(''),
               'NetworkCardSpeed': '',
               'NetworkCardName': '',
               'NetworkCardType': '',
@@ -114,7 +114,7 @@
               'GlobalId': '',
               'Keep': '',
               'Id': ''
-            }) | map('combine', {'MacAddress': attribute | default('')}) | list
+            }) | list
           }}
       loop: "{{ processed_devices }}"
       loop_control:
