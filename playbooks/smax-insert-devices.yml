@@ -113,24 +113,10 @@
       set_fact:
         clean_network_cards: >-
           {{
-            '[\n' + (
-              mac_list | map('to_yaml') | join(',\n')
-            ) + '\n]' | from_yaml
+            '[{% for mac in mac_list %}{"MacAddress": "{{ mac }}", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}{% endfor %}]' | from_yaml
           }}
       vars:
-        mac_list: >-
-          [{% for mac in item.mac_addresses | default([]) %}
-            {
-              MacAddress: "{{ mac }}",
-              NetworkCardSpeed: "",
-              NetworkCardName: "",
-              NetworkCardType: "",
-              NetworkCardRole: "",
-              GlobalId: "",
-              Keep: "",
-              Id: ""
-            }{% if not loop.last %},{% endif %}
-          {% endfor %}]
+        mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
       loop: "{{ devices }}"
       loop_control:
         loop_var: item
