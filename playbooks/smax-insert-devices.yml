@@ -125,7 +125,8 @@
                 # Additional properties
 #                Status: "{{ item.status | default('In Service') }}"
                 # NetworkCards: mac_addresses içindeki her bir eleman için MacAddress ve Name alanlarını doldur
-                NetworkCards: "{\"NetworkCard\":[{\"MacAddress\":\"{{ item.mac_addresses[0].mac | default('') }}\",\"NetworkCardSpeed\":\"\",\"NetworkCardName\":\"\",\"NetworkCardType\":\"\",\"NetworkCardRole\":\"\",\"GlobalId\":\"\",\"Keep\":\"\",\"Id\":\"\"}]}"
+                NetworkCards: >-
+                  {{ "{\"NetworkCard\":[{\"MacAddress\":\"" ~ (item.mac_addresses[0].mac | default('')) ~ "\",\"NetworkCardSpeed\":\"\",\"NetworkCardName\":\"\",\"NetworkCardType\":\"\",\"NetworkCardRole\":\"\",\"GlobalId\":\"\",\"Keep\":\"\",\"Id\":\"\"}]}" if item.mac_addresses is defined and item.mac_addresses | length > 0 else omit }}
                 Vendor: "{{ item.manufacturer | default('') }}"
                 Model: "{{ item.hw_model | default('') }}"
                 Environment: "{{ item.service_level | default('') }}"
