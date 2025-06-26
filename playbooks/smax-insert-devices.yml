@@ -76,6 +76,16 @@
         msg: "cpuspeed: {{ item.cpuspeed }}, cpu_speed: {{ item.cpu_speed }}, mac_addresses: {{ item.mac_addresses }}"
       when: item is defined
 
+    - name: Debug IP address extraction
+      debug:
+        msg: |
+          Device: {{ item.name }}
+          IP Addresses Array: {{ item.ip_addresses }}
+          First IP Object: {{ (item.ip_addresses | default([]) | first | default({})) }}
+          Extracted IP: {{ (item.ip_addresses | default([]) | first | default({})).ip | default('NO_IP_FOUND') }}
+      loop: "{{ processed_devices }}"
+      when: processed_devices is defined
+
     - name: Send each device to SMAX
       vars:
         device_payload:
@@ -91,8 +101,8 @@
                 HostName: "{{ item.name | default('') }}"
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
                 OsName: "{{ item.os | default('') }}"
-                # IP Addresses - use first available IP
-                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | map('extract', ['ip']) | list | first | default(item.ip_address | default(item.primary_ip | default(item.ip | default(''))))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                # IP Addresses - use first available IP from ip_addresses array
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # CPU Information
                 Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
