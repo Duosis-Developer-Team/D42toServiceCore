@@ -109,9 +109,9 @@
         loop_var: item
       register: mac_list_results
 
-    - name: Build clean network cards for each device
+    - name: Build clean network cards string for each device
       set_fact:
-        clean_network_cards: >-
+        clean_network_cards_str: >-
           {% if item.mac_addresses | default([]) | length == 0 %}
           []
           {% else %}
@@ -121,8 +121,15 @@
           {% endfor %}
           ]
           {% endif %}
-          | from_yaml
       loop: "{{ devices }}"
+      loop_control:
+        loop_var: item
+      register: clean_network_cards_str_results
+
+    - name: Parse clean network cards string to list
+      set_fact:
+        clean_network_cards: "{{ item.clean_network_cards_str | from_yaml }}"
+      loop: "{{ clean_network_cards_str_results.results }}"
       loop_control:
         loop_var: item
       register: clean_network_cards_results
