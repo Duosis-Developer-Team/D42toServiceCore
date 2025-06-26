@@ -92,7 +92,7 @@
                 D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
                 OsName: "{{ item.os | default('') }}"
                 # IP Addresses - use first available IP
-                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.processed_ips | default([]) | select('string') | list | first | default(item.ip_address | default(item.primary_ip | default(item.ip | default(''))))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | map('extract', ['ip']) | list | first | default(item.ip_address | default(item.primary_ip | default(item.ip | default(''))))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # CPU Information
                 Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
                 # Disk Information
