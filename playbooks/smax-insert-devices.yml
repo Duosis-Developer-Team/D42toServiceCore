@@ -101,13 +101,13 @@
       loop: "{{ processed_devices }}"
       when: processed_devices is defined
 
-    - name: Extract mac addresses for each device
+    - name: Extract mac addresses and network card names for each device
       set_fact:
-        mac_list: "{{ item.mac_addresses | default([]) | map(attribute='mac') | list }}"
+        mac_and_names: "{{ item.mac_addresses | default([]) | map('combine', {'extracted_mac': item.mac, 'extracted_name': item.port_name | default('')}) | list }}"
       loop: "{{ devices }}"
       loop_control:
         loop_var: item
-      register: mac_list_results
+      register: mac_and_names_results
 
     - name: Build clean network cards string for each device
       set_fact:
@@ -117,7 +117,7 @@
           {% else %}
           [
           {% for mac in item.mac_addresses | default([]) %}
-            {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
+            {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "{{ mac.port_name | default('') }}", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
           {% endfor %}
           ]
           {% endif %}
