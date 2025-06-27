@@ -128,7 +128,7 @@
 
     - name: Parse clean network cards string to list
       set_fact:
-        clean_network_cards: "{{ item.clean_network_cards_str | from_yaml }}"
+        clean_network_cards: "{{ item.ansible_facts.clean_network_cards_str | from_yaml }}"
       loop: "{{ clean_network_cards_str_results.results }}"
       loop_control:
         loop_var: item
