@@ -1,0 +1,89 @@
+---
+- name: D42 ve SMAX cihazlarını karşılaştır
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # D42 için
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars ile gelmeli
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars ile gelmeli
+    # SMAX için
+    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars ile gelmeli
+    smax_user: "{{ smax_user }}"  # AWX Extra Vars ile gelmeli
+    smax_pass: "{{ smax_pass }}"  # AWX Extra Vars ile gelmeli
+    smax_api_url: "{{ smax_api_url }}"  # AWX Extra Vars ile gelmeli
+    smax_layout: "LastUpdateTime,DisplayLabel,Description,Cpus,MemorySize,RunningSoftwares,D42id_c,IpAddresses,OsName,DiskDevices,NetworkCards"
+    smax_tenantid: "669866050"
+
+  tasks:
+    - name: D42 cihazlarını çek
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        headers:
+          Authorization: "{{ device42_auth_header }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: d42_response
+
+    - name: D42 cihaz listesini çıkar
+      set_fact:
+        d42_devices: "{{ d42_response.json.Devices | default(d42_response.json.devices) }}"
+
+    - name: SMAX token al
+      uri:
+        url: "{{ smax_token_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ { 'Login': smax_user, 'Password': smax_pass } | to_json }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_token_response
+
+    - name: SMAX token'ı çıkar
+      set_fact:
+        smax_token: "{{ smax_token_response.content }}"
+
+    - name: SMAX cihazlarını çek
+      uri:
+        url: "{{ smax_api_url }}?layout={{ smax_layout | urlencode }}"
+        method: GET
+        headers:
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}; TENANTID={{ smax_tenantid }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_response
+
+    - name: SMAX cihaz listesini çıkar
+      set_fact:
+        smax_devices: "{{ smax_response.json.entities | default([]) }}"
+
+    - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir
+      set_fact:
+        d42_ids: "{{ d42_devices | map(attribute='device_id') | list }}"
+        smax_ids: "{{ smax_devices | map(attribute='properties.D42id_c') | list }}"
+
+    - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
+      set_fact:
+        yeni_yazdirilacak_cihazlar: >-
+          {{ d42_devices | selectattr('device_id', 'defined') | selectattr('device_id', 'in', (d42_ids | difference(smax_ids))) | list }}
+
+    - name: İki tarafta da olup farklı olan cihazları bul (Güncellenecek Cihazlar)
+      set_fact:
+        guncellenecek_cihazlar: >-
+          {{ d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | selectattr('device_id', 'in', (
+            d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | map('extract', attribute='device_id') | list
+          )) | list }}
+
+    - name: Sonuçları göster
+      debug:
+        msg: |
+          Yeni Yazdırılacak Cihazlar (D42'de olup SMAX'de olmayanlar):
+          {{ yeni_yazdirilacak_cihazlar | map(attribute='name') | list }}
+
+          Güncellenecek Cihazlar (İki tarafta da olup farklı olanlar):
+          {{ guncellenecek_cihazlar | map(attribute='name') | list }}
