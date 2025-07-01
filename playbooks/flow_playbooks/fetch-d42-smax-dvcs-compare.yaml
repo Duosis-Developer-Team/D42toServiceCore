@@ -74,10 +74,15 @@
       set_fact:
         smax_devices: "{{ smax_response.json.entities | default([]) }}"
 
+    - name: SMAX cihazlarının properties alanlarını göster
+      debug:
+        msg: "{{ item.properties }}"
+      loop: "{{ smax_devices }}"
+
     - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir
       set_fact:
-        d42_ids: "{{ d42_devices | map(attribute='device_id') | list }}"
-        smax_ids: "{{ smax_devices | map(attribute='properties.D42id_c') | list }}"
+        d42_ids: "{{ d42_devices | map(attribute='device_id') | select('string') | list }}"
+        smax_ids: "{{ smax_devices | map(attribute='properties') | map('extract', 'D42id_c', default='') | select('string') | list }}"
 
     - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
       set_fact:
@@ -87,9 +92,7 @@
     - name: İki tarafta da olup farklı olan cihazları bul (Güncellenecek Cihazlar)
       set_fact:
         guncellenecek_cihazlar: >-
-          {{ d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | selectattr('device_id', 'in', (
-            d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | map('extract', attribute='device_id') | list
-          )) | list }}
+          {{ d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | list }}
 
     - name: Sonuçları göster
       debug:
