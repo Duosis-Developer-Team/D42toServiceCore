@@ -82,7 +82,7 @@
     - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir
       set_fact:
         d42_ids: "{{ d42_devices | map(attribute='device_id') | select('string') | list }}"
-        smax_ids: "{{ smax_devices | map(attribute='properties') | map('extract', 'D42id_c', default='') | select('string') | list }}"
+        smax_ids: "{{ smax_devices | map(attribute='properties') | map(attribute='D42id_c') | select('string') | list }}"
 
     - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
       set_fact:
