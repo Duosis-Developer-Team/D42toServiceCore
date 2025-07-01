@@ -47,6 +47,10 @@
       set_fact:
         smax_token: "{{ smax_token_response.content }}"
 
+    - name: SMAX token response'unu göster
+      debug:
+        var: smax_token_response
+
     - name: SMAX cihazlarını çek
       uri:
         url: "{{ smax_api_url }}?layout={{ smax_layout | urlencode }}"
@@ -57,6 +61,14 @@
         status_code: 200
         validate_certs: no
       register: smax_response
+
+    - name: SMAX cihaz çekme response'unu göster
+      debug:
+        var: smax_response
+
+    - name: SMAX cihaz çekme response'unun json'unu göster
+      debug:
+        var: smax_response.json
 
     - name: SMAX cihaz listesini çıkar
       set_fact:
