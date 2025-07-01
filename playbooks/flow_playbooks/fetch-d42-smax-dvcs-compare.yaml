@@ -79,10 +79,26 @@
         msg: "{{ item.properties }}"
       loop: "{{ smax_devices }}"
 
+    - name: SMAX cihazlarını normalize et (Device42 formatına dönüştür)
+      set_fact:
+        smax_devices_normalized: >-
+          {{ smax_devices | map('combine', {
+            'device_id': (item.properties.D42id_c | default(item.properties.Id | default(''))),
+            'name': (item.properties.DisplayLabel | default('')),
+            'ram': (item.properties.MemorySize | default('')),
+            'os': (item.properties.OsName | default('')),
+            'ip_addresses': (item.properties.IpAddresses | default('')),
+            'hdd_details': (item.properties.DiskDevices | default('')),
+            'cpus': (item.properties.Cpus | default(''))
+          }) | list }}
+      loop: "{{ smax_devices }}"
+      loop_control:
+        loop_var: item
+
     - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir
       set_fact:
         d42_ids: "{{ d42_devices | map(attribute='device_id') | select('string') | list }}"
-        smax_ids: "{{ smax_devices | map(attribute='properties') | map(attribute='D42id_c') | select('string') | list }}"
+        smax_ids: "{{ smax_devices_normalized | map(attribute='device_id') | select('string') | list }}"
 
     - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
       set_fact:
