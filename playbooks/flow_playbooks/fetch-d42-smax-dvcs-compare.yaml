@@ -165,7 +165,7 @@
           Cihaz: {{ item.name }}
           Device42 LastUpdated: {{ item.last_updated }}
           SMAX LastUpdateTime: {{ smax_dict[item.name].last_update_time | default('YOK') }}
-      loop: "{{ guncellenecek_cihazlar }}"
+      #loop: "{{ guncellenecek_cihazlar }}"
       when: guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0
 
     - name: Sonuçları göster
