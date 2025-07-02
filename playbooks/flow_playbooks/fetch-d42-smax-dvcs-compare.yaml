@@ -158,7 +158,8 @@
           Cihaz: {{ item.name }}
           Device42 LastUpdated: {{ item.last_updated }}
           SMAX LastUpdateTime: {{ smax_dict[item.name].last_update_time | default('YOK') }}
-      loop: "{{ guncellenecek_cihazlar }}"
+      loop: "{{ guncellenecek_cihazlar | default([]) }}"
+      when: guncellenecek_cihazlar | length > 0
 
 
 
@@ -166,7 +167,7 @@
       debug:
         msg: |
           Yeni Yazdırılacak Cihazlar (D42'de olup SMAX'de olmayanlar):
-          {{ yeni_yazdirilacak_cihazlar | map(attribute='name') | list }}
+          {{ yeni_yazdirilacak_cihazlar | default([]) | map(attribute='name') | list }}
 
-          Güncellenecek Cihazlar (İki tarafta da olup farklı olanlar):
-          {{ guncellenecek_cihazlar | map(attribute='name') | list }}
+          Güncellenecek Cihazlar (LastUpdated karşılaştırmalı):
+          {{ guncellenecek_cihazlar | default([]) | map(attribute='name') | list }}
