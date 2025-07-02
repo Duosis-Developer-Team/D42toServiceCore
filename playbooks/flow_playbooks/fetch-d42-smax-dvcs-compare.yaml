@@ -162,10 +162,12 @@
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
       debug:
         msg: >-
-          Cihaz: {{ item.name }}
-          Device42 LastUpdated: {{ item.last_updated }}
-          SMAX LastUpdateTime: {{ smax_dict[item.name].last_update_time | default('YOK') }}
-      #loop: "{{ guncellenecek_cihazlar }}"
+          {% for device in guncellenecek_cihazlar %}
+          Cihaz: {{ device.name }}
+          Device42 LastUpdated: {{ device.last_updated }}
+          SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
+          ---
+          {% endfor %}
       when: guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0
 
     - name: Sonuçları göster
