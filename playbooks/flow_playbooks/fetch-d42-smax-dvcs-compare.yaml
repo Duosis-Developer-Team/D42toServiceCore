@@ -138,11 +138,18 @@
           {% set farklar = [] %}
           {% for alan in ['manufacturer', 'hw_model', 'ip_addresses', 'mac_addresses', 'cpus', 'hdd_details', 'memory', 'os'] %}
             {% if d42.get(alan) != smax.get(alan) %}
-              {% set _ = farklar.append(alan ~ ': D42=' ~ (d42.get(alan)|string) ~ ', SMAX=' ~ (smax.get(alan)|string)) %}
+              {% set d42_val = d42.get(alan) %}
+              {% set smax_val = smax.get(alan) %}
+              {% if d42_val is mapping or d42_val is sequence %}
+                {% set d42_val = d42_val | to_nice_json %}
+              {% endif %}
+              {% if smax_val is mapping or smax_val is sequence %}
+                {% set smax_val = smax_val | to_nice_json %}
+              {% endif %}
+              {% set _ = farklar.append('  - ' ~ alan ~ ':\n      D42: ' ~ d42_val|string ~ '\n      SMAX: ' ~ smax_val|string) %}
             {% endif %}
           {% endfor %}
-          {{ d42.name }} için farklı alanlar:
-          {{ farklar if farklar else 'YOK' }}
+          {{ d42.name }} için farklı alanlar:\n{{ farklar | join('\n') if farklar else '  YOK' }}
       loop: "{{ guncellenecek_cihazlar }}"
 
     - name: Sonuçları göster
