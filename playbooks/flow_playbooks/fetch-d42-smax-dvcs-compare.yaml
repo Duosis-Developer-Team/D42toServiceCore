@@ -137,8 +137,8 @@
           {% set smax = smax_dict[d42.name] %}
           {% set farklar = [] %}
           {% for alan in ['manufacturer', 'hw_model', 'ip_addresses', 'mac_addresses', 'cpus', 'hdd_details', 'memory', 'os'] %}
-            {% if d42[alan] != smax[alan] %}
-              {% set _ = farklar.append(alan ~ ': D42=' ~ d42[alan]|string ~ ', SMAX=' ~ smax[alan]|string) %}
+            {% if d42.get(alan) != smax.get(alan) %}
+              {% set _ = farklar.append(alan ~ ': D42=' ~ (d42.get(alan)|string) ~ ', SMAX=' ~ (smax.get(alan)|string)) %}
             {% endif %}
           {% endfor %}
           {{ d42.name }} için farklı alanlar:
