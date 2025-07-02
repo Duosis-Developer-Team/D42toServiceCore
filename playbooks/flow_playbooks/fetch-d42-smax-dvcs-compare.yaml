@@ -128,6 +128,23 @@
         guncellenecek_cihazlar: >-
           {{ d42_devices | selectattr('name', 'in', (d42_names | intersect(smax_names))) | selectattr('name', 'defined') | list }}
 
+    - name: Güncellenecek cihazlarda farklı olan alanları göster
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+      debug:
+        msg: >-
+          {% set d42 = item %}
+          {% set smax = smax_dict[d42.name] %}
+          {% set farklar = [] %}
+          {% for alan in ['manufacturer', 'hw_model', 'ip_addresses', 'mac_addresses', 'cpus', 'hdd_details', 'memory', 'os'] %}
+            {% if d42[alan] != smax[alan] %}
+              {% set _ = farklar.append(alan ~ ': D42=' ~ d42[alan]|string ~ ', SMAX=' ~ smax[alan]|string) %}
+            {% endif %}
+          {% endfor %}
+          {{ d42.name }} için farklı alanlar:
+          {{ farklar if farklar else 'YOK' }}
+      loop: "{{ guncellenecek_cihazlar }}"
+
     - name: Sonuçları göster
       debug:
         msg: |
