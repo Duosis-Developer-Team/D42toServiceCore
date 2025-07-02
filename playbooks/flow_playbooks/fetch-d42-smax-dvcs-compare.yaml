@@ -132,16 +132,12 @@
       set_fact:
         guncellenecek_cihazlar: []
 
-    - name: Her D42 cihazını kontrol et ve güncellenecek listesine ekle
+    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
-        guncellenecek_cihazlar: "{{ guncellenecek_cihazlar + [item] }}"
-      when: >
-        item.name is defined and
-        item.name in (d42_names | intersect(smax_names)) and
-        item.last_updated is defined and
-        smax_dict[item.name].last_update_time is defined and
-        (item.last_updated | int) > (smax_dict[item.name].last_update_time | int)
-      loop: "{{ d42_devices }}"
+        guncellenecek_cihazlar: >-
+          {{ d42_devices | selectattr('name', 'defined') | selectattr('name', 'in', (d42_names | intersect(smax_names))) | selectattr('last_updated', 'defined') | list | select('map', 'combine', {'smax_last_update': smax_dict[item.name].last_update_time | default(0)}) | select('map', 'combine', {'needs_update': (item.last_updated | int) > (item.smax_last_update | int)}) | selectattr('needs_update', 'equalto', true) | list }}
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
 
     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
       vars:
