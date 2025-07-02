@@ -74,48 +74,49 @@
       set_fact:
         smax_devices: "{{ smax_response.json.entities | default([]) }}"
 
-    - name: SMAX cihazlarının properties alanlarını göster
-      debug:
-        msg: "{{ item.properties }}"
-      loop: "{{ smax_devices }}"
-
-    - name: D42 cihazlarını SMAX properties formatına dönüştür
+    - name: SMAX cihazlarını Device42 formatına dönüştür
       set_fact:
-        d42_devices_properties: >-
-          {{ d42_devices | map('combine', {'properties': {
-            'D42id_c': (item.device_id | string),
-            'DisplayLabel': item.name | default(''),
-            'MemorySize': item.ram | default(''),
-            'OsName': item.os | default(''),
-            'IpAddresses': item.ip_addresses | default([]),
-            'Cpus': item.cpucount | default(''),
-            'DiskDevices': item.hdd_details | default([]),
-            'NetworkCards': item.mac_addresses | default([])
-          }}) | list }}
-      loop: "{{ d42_devices }}"
+        smax_devices_mapped: >-
+          {{ smax_devices | map(attribute='properties') | map('combine', {
+            'device_id': item.D42id_c | default(''),
+            'name': item.DisplayLabel | default(''),
+            'manufacturer': item.Vendor | default(''),
+            'hw_model': item.Model | default(''),
+            'ip_addresses': (item.IpAddresses | from_json) if (item.IpAddresses is defined and item.IpAddresses|length > 0) else [],
+            'mac_addresses': (item.NetworkCards | from_json | map(attribute='MacAddress') | list) if (item.NetworkCards is defined and item.NetworkCards|length > 0) else [],
+            'cpus': (item.Cpus | from_json) if (item.Cpus is defined and item.Cpus|length > 0) else [],
+            'hdd_details': (item.DiskDevices | from_json) if (item.DiskDevices is defined and item.DiskDevices|length > 0) else [],
+            'memory': item.MemorySize | default(''),
+            'os': item.OsName | default('')
+          }) | list }}
+      loop: "{{ smax_devices | map(attribute='properties') | list }}"
       loop_control:
         loop_var: item
 
-    - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir (properties formatı ile)
+    - name: SMAX cihazlarının Device42 formatındaki halini göster
+      debug:
+        var: smax_devices_mapped
+
+    - name: D42 ve SMAX cihazlarını D42id_c/id üzerinden eşleştir
       set_fact:
-        d42_ids: "{{ d42_devices_properties | map(attribute='properties') | map(attribute='D42id_c') | select('string') | list }}"
-        smax_ids: "{{ smax_devices | map(attribute='properties') | map(attribute='D42id_c') | select('string') | list }}"
+        d42_ids: "{{ d42_devices | map(attribute='device_id') | select('string') | list }}"
+        smax_ids: "{{ smax_devices_mapped | map(attribute='device_id') | select('string') | list }}"
 
     - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
       set_fact:
         yeni_yazdirilacak_cihazlar: >-
-          {{ d42_devices_properties | selectattr('properties.D42id_c', 'in', (d42_ids | difference(smax_ids))) | list }}
+          {{ d42_devices | selectattr('device_id', 'defined') | selectattr('device_id', 'in', (d42_ids | difference(smax_ids))) | list }}
 
     - name: İki tarafta da olup farklı olan cihazları bul (Güncellenecek Cihazlar)
       set_fact:
         guncellenecek_cihazlar: >-
-          {{ d42_devices_properties | selectattr('properties.D42id_c', 'in', (d42_ids | intersect(smax_ids))) | list }}
+          {{ d42_devices | selectattr('device_id', 'in', (d42_ids | intersect(smax_ids))) | selectattr('device_id', 'defined') | list }}
 
     - name: Sonuçları göster
       debug:
         msg: |
           Yeni Yazdırılacak Cihazlar (D42'de olup SMAX'de olmayanlar):
-          {{ yeni_yazdirilacak_cihazlar | map(attribute='properties.DisplayLabel') | list }}
+          {{ yeni_yazdirilacak_cihazlar | map(attribute='name') | list }}
 
           Güncellenecek Cihazlar (İki tarafta da olup farklı olanlar):
-          {{ guncellenecek_cihazlar | map(attribute='properties.DisplayLabel') | list }}
+          {{ guncellenecek_cihazlar | map(attribute='name') | list }}
