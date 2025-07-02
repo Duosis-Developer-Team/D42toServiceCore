@@ -137,11 +137,18 @@
 
     - name: Güncellenecek cihazları bul (LastUpdated karşılaştırmalı)
       set_fact:
-        guncellenecek_cihazlar: >-
-          {{ d42_devices_with_last | selectattr('name', 'in', (d42_names | intersect(smax_names))) | selectattr('name', 'defined') | selectattr('last_updated', 'defined') | selectattr('name', 'defined') | selectattr('last_updated', '>', (smax_dict[item.name].last_update_time | default(0)), ['item']) | list }}
+        guncellenecek_cihazlar: []
+
+    - name: Her D42 cihazını kontrol et ve güncellenecek listesine ekle
+      set_fact:
+        guncellenecek_cihazlar: "{{ guncellenecek_cihazlar + [item] }}"
+      when: >
+        item.name is defined and
+        item.name in (d42_names | intersect(smax_names)) and
+        item.last_updated is defined and
+        smax_dict[item.name].last_update_time is defined and
+        (item.last_updated | int) > (smax_dict[item.name].last_update_time | int)
       loop: "{{ d42_devices_with_last }}"
-      loop_control:
-        loop_var: item
 
     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
       vars:
@@ -153,31 +160,7 @@
           SMAX LastUpdateTime: {{ smax_dict[item.name].last_update_time | default('YOK') }}
       loop: "{{ guncellenecek_cihazlar }}"
 
-#    - name: Güncellenecek cihazlarda farklı olan alanları göster
-#      vars:
-#        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
-#      debug:
-#        msg: >-
-#          {% set d42 = item %}
-#          {% set smax = smax_dict[d42.name] %}
-#          {% set farklar = [] %}
-#          {% for alan in ['memory', 'serial_no', 'uuid', 'name', 'device_id', 'os', 'ip_addresses', 'cpus', 'hdd_details', 'mac_addresses', 'manufacturer', 'hw_model', 'service_level'] %}
-#            {% set d42_val = d42.get(alan) %}
-#            {% set smax_val = smax.get(alan) %}
-#            {% set d42_empty = d42_val is none or d42_val == '' or d42_val == [] %}
-#            {% set smax_empty = smax_val is none or smax_val == '' or smax_val == [] %}
-#            {% if not (d42_empty and smax_empty) and d42_val != smax_val %}
-#              {% if d42_val is mapping or d42_val is sequence %}
-#                {% set d42_val = d42_val | to_nice_json %}
-#              {% endif %}
-#              {% if smax_val is mapping or smax_val is sequence %}
-#                {% set smax_val = smax_val | to_nice_json %}
-#              {% endif %}
-#              {% set _ = farklar.append('  - ' ~ alan ~ ':\n      D42: ' ~ d42_val|string ~ '\n      SMAX: ' ~ smax_val|string) %}
-#            {% endif %}
-#          {% endfor %}
-#          {{ d42.name }} için farklı alanlar:\n{{ farklar | join('\n') if farklar else '  YOK' }}
-#      loop: "{{ guncellenecek_cihazlar }}"
+
 
     - name: Sonuçları göster
       debug:
