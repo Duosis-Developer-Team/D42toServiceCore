@@ -136,7 +136,7 @@
           {% set d42 = item %}
           {% set smax = smax_dict[d42.name] %}
           {% set farklar = [] %}
-          {% for alan in ['manufacturer', 'hw_model', 'ip_addresses', 'mac_addresses', 'cpus', 'hdd_details', 'memory', 'os'] %}
+          {% for alan in ['memory', 'serial_no', 'uuid', 'name', 'device_id', 'os', 'ip_addresses', 'cpus', 'hdd_details', 'mac_addresses', 'manufacturer', 'hw_model', 'service_level'] %}
             {% if d42.get(alan) != smax.get(alan) %}
               {% set d42_val = d42.get(alan) %}
               {% set smax_val = smax.get(alan) %}
