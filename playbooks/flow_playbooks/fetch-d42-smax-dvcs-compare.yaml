@@ -138,7 +138,9 @@
             {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
               {% set smax_device = smax_dict.get(d42_device.name) %}
               {% if smax_device and smax_device.last_update_time is defined %}
-                {% if (d42_device.last_updated | int) > (smax_device.last_update_time | int) %}
+                {% set d42_epoch = (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int %}
+                {% set smax_epoch = (smax_device.last_update_time // 1000) | int %}
+                {% if d42_epoch > smax_epoch %}
                   {% set _ = result.append(d42_device) %}
                 {% endif %}
               {% endif %}
