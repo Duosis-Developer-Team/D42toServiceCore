@@ -135,9 +135,20 @@
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
         guncellenecek_cihazlar: >-
-          {{ d42_devices | selectattr('name', 'defined') | selectattr('name', 'in', (d42_names | intersect(smax_names))) | selectattr('last_updated', 'defined') | list | select('map', 'combine', {'smax_last_update': smax_dict[item.name].last_update_time | default(0)}) | select('map', 'combine', {'needs_update': (item.last_updated | int) > (item.smax_last_update | int)}) | selectattr('needs_update', 'equalto', true) | list }}
-      vars:
-        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
+          {% set common_names = d42_names | intersect(smax_names) %}
+          {% set result = [] %}
+          {% for d42_device in d42_devices %}
+            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
+              {% set smax_device = smax_dict.get(d42_device.name) %}
+              {% if smax_device and smax_device.last_update_time is defined %}
+                {% if (d42_device.last_updated | int) > (smax_device.last_update_time | int) %}
+                  {% set _ = result.append(d42_device) %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ result }}
 
     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
       vars:
