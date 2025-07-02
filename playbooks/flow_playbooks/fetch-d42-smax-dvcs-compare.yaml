@@ -137,9 +137,11 @@
           {% set smax = smax_dict[d42.name] %}
           {% set farklar = [] %}
           {% for alan in ['memory', 'serial_no', 'uuid', 'name', 'device_id', 'os', 'ip_addresses', 'cpus', 'hdd_details', 'mac_addresses', 'manufacturer', 'hw_model', 'service_level'] %}
-            {% if d42.get(alan) != smax.get(alan) %}
-              {% set d42_val = d42.get(alan) %}
-              {% set smax_val = smax.get(alan) %}
+            {% set d42_val = d42.get(alan) %}
+            {% set smax_val = smax.get(alan) %}
+            {% set d42_empty = d42_val is none or d42_val == '' or d42_val == [] %}
+            {% set smax_empty = smax_val is none or smax_val == '' or smax_val == [] %}
+            {% if not (d42_empty and smax_empty) and d42_val != smax_val %}
               {% if d42_val is mapping or d42_val is sequence %}
                 {% set d42_val = d42_val | to_nice_json %}
               {% endif %}
