@@ -154,14 +154,19 @@
       vars:
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
       debug:
+        msg: "Güncellenecek cihaz bulunamadı"
+      when: guncellenecek_cihazlar is not defined or guncellenecek_cihazlar | length == 0
+
+    - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster (detaylı)
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+      debug:
         msg: >-
           Cihaz: {{ item.name }}
           Device42 LastUpdated: {{ item.last_updated }}
           SMAX LastUpdateTime: {{ smax_dict[item.name].last_update_time | default('YOK') }}
-      loop: "{{ guncellenecek_cihazlar | default([]) }}"
-      when: guncellenecek_cihazlar | length > 0
-
-
+      loop: "{{ guncellenecek_cihazlar }}"
+      when: guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0
 
     - name: Sonuçları göster
       debug:
