@@ -114,22 +114,15 @@
       debug:
         msg: "{{ smax_devices_mapped | map(attribute='name') | list }}"
 
-    - name: D42 cihazlarına last_updated alanını ekle
-      set_fact:
-        d42_devices_with_last: "{{ d42_devices | map('combine', {'last_updated': (item.last_updated | default(0))}) | list }}"
-      loop: "{{ d42_devices }}"
-      loop_control:
-        loop_var: item
-
     - name: D42 ve SMAX cihazlarını isim (name) üzerinden eşleştir
       set_fact:
-        d42_names: "{{ d42_devices_with_last | map(attribute='name') | select('string') | list }}"
+        d42_names: "{{ d42_devices | map(attribute='name') | select('string') | list }}"
         smax_names: "{{ smax_devices_mapped | map(attribute='name') | select('string') | list }}"
 
     - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
       set_fact:
         yeni_yazdirilacak_cihazlar: >-
-          {{ d42_devices_with_last | selectattr('name', 'defined') | selectattr('name', 'in', (d42_names | difference(smax_names))) | list }}
+          {{ d42_devices | selectattr('name', 'defined') | selectattr('name', 'in', (d42_names | difference(smax_names))) | list }}
 
     - name: SMAX cihazlarını isimden dict'e çevir (last_update_time için)
       set_fact:
@@ -148,7 +141,7 @@
         item.last_updated is defined and
         smax_dict[item.name].last_update_time is defined and
         (item.last_updated | int) > (smax_dict[item.name].last_update_time | int)
-      loop: "{{ d42_devices_with_last }}"
+      loop: "{{ d42_devices }}"
 
     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
       vars:
