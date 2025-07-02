@@ -76,22 +76,30 @@
 
     - name: SMAX cihazlarını Device42 formatına dönüştür
       set_fact:
-        smax_devices_mapped: >-
-          {{ smax_devices | map(attribute='properties') | map('combine', {
-            'device_id': item.D42id_c | default(''),
-            'name': item.DisplayLabel | default(''),
-            'manufacturer': item.Vendor | default(''),
-            'hw_model': item.Model | default(''),
-            'ip_addresses': (item.IpAddresses | from_json) if (item.IpAddresses is defined and item.IpAddresses|length > 0) else [],
-            'mac_addresses': (item.NetworkCards | from_json | map(attribute='MacAddress') | list) if (item.NetworkCards is defined and item.NetworkCards|length > 0) else [],
-            'cpus': (item.Cpus | from_json) if (item.Cpus is defined and item.Cpus|length > 0) else [],
-            'hdd_details': (item.DiskDevices | from_json) if (item.DiskDevices is defined and item.DiskDevices|length > 0) else [],
-            'memory': item.MemorySize | default(''),
-            'os': item.OsName | default('')
-          }) | list }}
-      loop: "{{ smax_devices | map(attribute='properties') | list }}"
-      loop_control:
-        loop_var: item
+        smax_devices_mapped: []
+
+    - name: SMAX cihazlarını Device42 formatına güvenli şekilde dönüştür (her cihaz için)
+      set_fact:
+        smax_devices_mapped: "{{ smax_devices_mapped + [ mapped_device ] }}"
+      vars:
+        nc_decoded: >-
+          {{ (item.properties.NetworkCards | from_json) if (item.properties.NetworkCards is defined and item.properties.NetworkCards|length > 0) else [] }}
+        mapped_device:
+          device_id: "{{ item.properties.D42id_c | default('') }}"
+          name: "{{ item.properties.DisplayLabel | default('') }}"
+          manufacturer: "{{ item.properties.Vendor | default('') }}"
+          hw_model: "{{ item.properties.Model | default('') }}"
+          ip_addresses: >-
+            {{ (item.properties.IpAddresses | from_json) if (item.properties.IpAddresses is defined and item.properties.IpAddresses|length > 0) else [] }}
+          mac_addresses: >-
+            {{ nc_decoded if nc_decoded is iterable and nc_decoded is not string else [] | map(attribute='MacAddress') | list }}
+          cpus: >-
+            {{ (item.properties.Cpus | from_json) if (item.properties.Cpus is defined and item.properties.Cpus|length > 0) else [] }}
+          hdd_details: >-
+            {{ (item.properties.DiskDevices | from_json) if (item.properties.DiskDevices is defined and item.properties.DiskDevices|length > 0) else [] }}
+          memory: "{{ item.properties.MemorySize | default('') }}"
+          os: "{{ item.properties.OsName | default('') }}"
+      loop: "{{ smax_devices }}"
 
     - name: SMAX cihazlarının Device42 formatındaki halini göster
       debug:
