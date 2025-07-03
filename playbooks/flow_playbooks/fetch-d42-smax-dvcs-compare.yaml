@@ -148,21 +148,41 @@
           {% endfor %}
           {{ result }}
 
-    - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
+    - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
       vars:
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+        common_names: "{{ d42_names | intersect(smax_names) }}"
       debug:
         msg: >-
-          {% if guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0 %}
-            {% for device in guncellenecek_cihazlar %}
-            Cihaz: {{ device.name }}
-            Device42 LastUpdated: {{ device.last_updated }}
-            SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
-            ---
-            {% endfor %}
-          {% else %}
-            Güncellenecek cihaz bulunamadı
-          {% endif %}
+          {% for d42_device in d42_devices %}
+            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
+              {% set smax_device = smax_dict.get(d42_device.name) %}
+              {% if smax_device and smax_device.last_update_time is defined %}
+                Device: {{ d42_device.name }}\n
+                Device42 last_updated: {{ d42_device.last_updated }}\n
+                Device42 epoch saniye: {{ (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int }}\n
+                SMAX last_update_time: {{ smax_device.last_update_time }}\n
+                SMAX epoch saniye: {{ (smax_device.last_update_time | int // 1000) }}\n
+                ---\n
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+
+     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
+     vars:
+       smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+     debug:
+       msg: >-
+         {% if guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0 %}
+           {% for device in guncellenecek_cihazlar %}
+           Cihaz: {{ device.name }}
+           Device42 LastUpdated: {{ device.last_updated }}
+           SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
+           ---
+           {% endfor %}
+         {% else %}
+           Güncellenecek cihaz bulunamadı
+         {% endif %}
 
     - name: Sonuçları göster
       debug:
