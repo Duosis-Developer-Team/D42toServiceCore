@@ -165,7 +165,30 @@
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
         guncellenecek_cihazlar: >-
-          {{ epoch_karsilastirma_listesi_int | selectattr('d42_epoch', '>', 'smax_epoch') | map(attribute='d42_device') | list }}
+          {{
+            epoch_karsilastirma_listesi_int
+            | selectattr('d42_epoch', 'defined')
+            | selectattr('smax_epoch', 'defined')
+            | selectattr('d42_epoch', 'is number')
+            | selectattr('smax_epoch', 'is number')
+            | selectattr('d42_epoch', '>', 'smax_epoch')
+            | map(attribute='d42_device')
+            | list
+          }}
+
+    - name: epoch_karsilastirma_listesi_int içeriğini göster
+      debug:
+        var: epoch_karsilastirma_listesi_int
+
+    - name: epoch_karsilastirma_listesi_int eleman tiplerini göster
+      debug:
+        msg: |
+          {% for item in epoch_karsilastirma_listesi_int %}
+          name: {{ item.name | default('YOK') }}
+          d42_epoch: {{ item.d42_epoch }} ({{ item.d42_epoch | type_debug }})
+          smax_epoch: {{ item.smax_epoch }} ({{ item.smax_epoch | type_debug }})
+          ---
+          {% endfor %}
 
     - name: Sonuçları göster
       debug:
@@ -175,3 +198,4 @@
 
           Güncellenecek Cihazlar (LastUpdated karşılaştırmalı):
           {{ guncellenecek_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
+
