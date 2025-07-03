@@ -128,29 +128,9 @@
       set_fact:
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
 
-    - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
-      vars:
-        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
-        common_names: "{{ d42_names | intersect(smax_names) }}"
-      debug:
-        msg: >-
-          {% for d42_device in d42_devices %}
-            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
-              {% set smax_device = smax_dict.get(d42_device.name) %}
-              {% if smax_device and smax_device.last_update_time is defined %}
-                Device: {{ d42_device.name }}\n
-                Device42 last_updated: {{ d42_device.last_updated }}\n
-                Device42 epoch saniye: {{ (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int }}\n
-                SMAX last_update_time: {{ smax_device.last_update_time }}\n
-                SMAX epoch saniye: {{ (smax_device.last_update_time | int // 1000) }}\n
-                ---\n
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-
-    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
+    - name: Ortak cihazlar için epoch değerlerini hazırla
       set_fact:
-        guncellenecek_cihazlar: >-
+        epoch_karsilastirma_listesi: >-
           {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
           {% set common_names = d42_names | intersect(smax_names) %}
           {% set result = [] %}
@@ -160,13 +140,35 @@
               {% if smax_device and smax_device.last_update_time is defined %}
                 {% set d42_epoch = (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int %}
                 {% set smax_epoch = (smax_device.last_update_time | int // 1000) %}
-                {% if d42_epoch > smax_epoch %}
-                  {% set _ = result.append(d42_device) %}
-                {% endif %}
+                {% set _ = result.append({
+                  'name': d42_device.name,
+                  'd42_last_updated': d42_device.last_updated,
+                  'd42_epoch': d42_epoch,
+                  'smax_last_update_time': smax_device.last_update_time,
+                  'smax_epoch': smax_epoch,
+                  'd42_device': d42_device
+                }) %}
               {% endif %}
             {% endif %}
           {% endfor %}
           {{ result }}
+
+    - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
+      debug:
+        msg: >-
+          {% for item in epoch_karsilastirma_listesi %}
+            Device: {{ item.name }}
+            Device42 last_updated: {{ item.d42_last_updated }}
+            Device42 epoch saniye: {{ item.d42_epoch }}
+            SMAX last_update_time: {{ item.smax_last_update_time }}
+            SMAX epoch saniye: {{ item.smax_epoch }}
+            ---
+          {% endfor %}
+
+    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
+      set_fact:
+        guncellenecek_cihazlar: >-
+          {{ epoch_karsilastirma_listesi | selectattr('d42_epoch', '>', 'smax_epoch') | map(attribute='d42_device') | list }}
 
     - name: Sonuçları göster
       debug:
