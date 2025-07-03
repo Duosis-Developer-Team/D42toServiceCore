@@ -151,16 +151,17 @@
           {%- endfor %}
           ]
 
-    - name: Epoch değerlerini int'e çeviren yeni liste oluştur
+    - name: Epoch değerlerini int'e çeviren yeni liste oluştur (loop ile)
       set_fact:
-        epoch_karsilastirma_listesi_int: >-
-          {{ epoch_karsilastirma_listesi | map('combine', {
-            'd42_epoch': (item.d42_epoch | int),
-            'smax_epoch': (item.smax_epoch | int)
-          }) | list }}
+        epoch_karsilastirma_listesi_int: "{{ epoch_karsilastirma_listesi_int | default([]) + [ {
+          'name': item.name,
+          'd42_last_updated': item.d42_last_updated,
+          'd42_epoch': (item.d42_epoch | int),
+          'smax_last_update_time': item.smax_last_update_time,
+          'smax_epoch': (item.smax_epoch | int),
+          'd42_device': item.d42_device
+        } ] }}"
       loop: "{{ epoch_karsilastirma_listesi }}"
-      loop_control:
-        label: "{{ item.name }}"
 
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
