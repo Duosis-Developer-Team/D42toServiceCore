@@ -100,6 +100,7 @@
           memory: "{{ item.properties.MemorySize | default('') }}"
           os: "{{ item.properties.OsName | default('') }}"
           last_update_time: "{{ item.properties.LastUpdateTime | default(0) }}"
+          SMAX_ID: "{{ item.properties.Id | default('') }}"
       loop: "{{ smax_devices }}"
 
     - name: SMAX cihazlarının Device42 formatındaki halini göster
@@ -226,7 +227,7 @@
               'MemorySize': (item.ram | default(item.memory | default(0))) | int,
               'BiosSerialNumber': item.serial_no | default(''),
               'BiosUUID': item.uuid | default(''),
-              'Id': smax.device_id | default(smax.id | default(smax.Id | default(''))),
+              'Id': smax.SMAX_ID | default(''),
               'HostName': item.name | default(''),
               'D42id_c': item.device_id | default(item.id) | default(''),
               'OsName': item.os | default(''),
