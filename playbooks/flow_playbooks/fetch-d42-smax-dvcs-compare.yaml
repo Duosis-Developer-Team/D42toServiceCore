@@ -198,6 +198,11 @@
           ---
           {% endfor %}
 
+    - name: guncellenecek_cihazlar'ı listeye çevir (gerekirse)
+      set_fact:
+        guncellenecek_cihazlar: "{{ guncellenecek_cihazlar | from_yaml }}"
+      when: guncellenecek_cihazlar is string
+
     - name: Sonuçları göster
       debug:
         msg: |
