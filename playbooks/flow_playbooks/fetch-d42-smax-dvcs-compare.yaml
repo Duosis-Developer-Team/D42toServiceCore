@@ -168,21 +168,21 @@
             {% endif %}
           {% endfor %}
 
-     - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
-     vars:
-       smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
-     debug:
-       msg: >-
-         {% if guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0 %}
-           {% for device in guncellenecek_cihazlar %}
-           Cihaz: {{ device.name }}
-           Device42 LastUpdated: {{ device.last_updated }}
-           SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
-           ---
-           {% endfor %}
-         {% else %}
-           Güncellenecek cihaz bulunamadı
-         {% endif %}
+    - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+    debug:
+      msg: >-
+        {% if guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0 %}
+          {% for device in guncellenecek_cihazlar %}
+          Cihaz: {{ device.name }}
+          Device42 LastUpdated: {{ device.last_updated }}
+          SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
+          ---
+          {% endfor %}
+        {% else %}
+          Güncellenecek cihaz bulunamadı
+        {% endif %}
 
     - name: Sonuçları göster
       debug:
