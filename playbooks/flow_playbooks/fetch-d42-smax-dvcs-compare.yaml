@@ -171,12 +171,16 @@
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
         guncellenecek_cihazlar: >-
-          {{
-            epoch_karsilastirma_listesi_int_filtered
-            | selectattr('d42_epoch', '>', 'smax_epoch')
-            | map(attribute='d42_device')
-            | list
-          }}
+          {% set result = [] %}
+          {% for item in epoch_karsilastirma_listesi_int_filtered %}
+            {% if item.d42_epoch is defined and item.smax_epoch is defined
+                  and (item.d42_epoch | type_debug) == 'int'
+                  and (item.smax_epoch | type_debug) == 'int'
+                  and item.d42_epoch > item.smax_epoch %}
+              {% set _ = result.append(item.d42_device) %}
+            {% endif %}
+          {% endfor %}
+          {{ result }}
 
     - name: epoch_karsilastirma_listesi_int içeriğini göster
       debug:
