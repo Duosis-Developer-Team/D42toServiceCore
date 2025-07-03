@@ -173,7 +173,8 @@
         guncellenecek_cihazlar: >-
           {% set result = [] %}
           {% for item in epoch_karsilastirma_listesi_int_filtered %}
-            {% if item.d42_epoch is defined and item.smax_epoch is defined
+            {% if item.d42_device is defined
+                  and item.d42_epoch is defined and item.smax_epoch is defined
                   and (item.d42_epoch | type_debug) == 'int'
                   and (item.smax_epoch | type_debug) == 'int'
                   and item.d42_epoch > item.smax_epoch %}
