@@ -188,7 +188,7 @@
       debug:
         msg: |
           Yeni Yazdırılacak Cihazlar (D42'de olup SMAX'de olmayanlar):
-          {{ yeni_yazdirilacak_cihazlar | default([]) | map(attribute='name') | list }}
+          {{ yeni_yazdirilacak_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
 
           Güncellenecek Cihazlar (LastUpdated karşılaştırmalı):
-          {{ guncellenecek_cihazlar | default([]) | map(attribute='name') | list }}
+          {{ guncellenecek_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
