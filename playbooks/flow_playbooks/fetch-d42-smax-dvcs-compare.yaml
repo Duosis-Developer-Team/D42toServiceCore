@@ -162,13 +162,17 @@
         } ] }}"
       loop: "{{ epoch_karsilastirma_listesi }}"
 
+    - name: Sadece epoch alanları int olanları yeni listeye ekle
+      set_fact:
+        epoch_karsilastirma_listesi_int_filtered: "{{ epoch_karsilastirma_listesi_int_filtered | default([]) + [ item ] }}"
+      when: (item.d42_epoch is not none and item.smax_epoch is not none and (item.d42_epoch | type_debug) == 'int' and (item.smax_epoch | type_debug) == 'int')
+      loop: "{{ epoch_karsilastirma_listesi_int }}"
+
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
       set_fact:
         guncellenecek_cihazlar: >-
           {{
-            epoch_karsilastirma_listesi_int
-            | selectattr('d42_epoch', 'defined')
-            | selectattr('smax_epoch', 'defined')
+            epoch_karsilastirma_listesi_int_filtered
             | selectattr('d42_epoch', '>', 'smax_epoch')
             | map(attribute='d42_device')
             | list
