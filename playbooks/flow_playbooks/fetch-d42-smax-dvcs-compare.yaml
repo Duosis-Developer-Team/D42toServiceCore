@@ -130,28 +130,26 @@
 
     - name: Ortak cihazlar için epoch değerlerini hazırla
       set_fact:
-        epoch_karsilastirma_listesi: >-
-          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
-          {% set common_names = d42_names | intersect(smax_names) %}
-          {% set result = [] %}
-          {% for d42_device in d42_devices %}
-            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
-              {% set smax_device = smax_dict.get(d42_device.name) %}
-              {% if smax_device and smax_device.last_update_time is defined %}
-                {% set d42_epoch = (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int %}
-                {% set smax_epoch = (smax_device.last_update_time | int // 1000) %}
-                {% set _ = result.append({
-                  'name': d42_device.name,
-                  'd42_last_updated': d42_device.last_updated,
-                  'd42_epoch': d42_epoch,
-                  'smax_last_update_time': smax_device.last_update_time,
-                  'smax_epoch': smax_epoch,
-                  'd42_device': d42_device
-                }) %}
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-          {{ result }}
+        epoch_karsilastirma_listesi: "{{ epoch_karsilastirma_listesi_raw | from_yaml }}"
+      vars:
+        epoch_karsilastirma_listesi_raw: |
+          [
+          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) -%}
+          {% set common_names = d42_names | intersect(smax_names) -%}
+          {%- for d42_device in d42_devices if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
+            {%- set smax_device = smax_dict.get(d42_device.name) -%}
+            {%- if smax_device and smax_device.last_update_time is defined %}
+              {
+                "name": "{{ d42_device.name }}",
+                "d42_last_updated": "{{ d42_device.last_updated }}",
+                "d42_epoch": {{ (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int }},
+                "smax_last_update_time": "{{ smax_device.last_update_time }}",
+                "smax_epoch": {{ (smax_device.last_update_time | int // 1000) }},
+                "d42_device": {{ d42_device | to_json }}
+              }{{ ',' if not loop.last else '' }}
+            {%- endif %}
+          {%- endfor %}
+          ]
 
     - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
       debug:
