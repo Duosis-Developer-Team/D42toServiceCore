@@ -169,8 +169,6 @@
             epoch_karsilastirma_listesi_int
             | selectattr('d42_epoch', 'defined')
             | selectattr('smax_epoch', 'defined')
-            | selectattr('d42_epoch', 'is number')
-            | selectattr('smax_epoch', 'is number')
             | selectattr('d42_epoch', '>', 'smax_epoch')
             | map(attribute='d42_device')
             | list
