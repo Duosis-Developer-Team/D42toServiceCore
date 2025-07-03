@@ -153,26 +153,16 @@
           {% endfor %}
           {{ result }}
 
-    - name: Ortak cihazlar ve güncellenecekler - epoch detaylı göster
+    - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
       debug:
         msg: >-
-          {% set guncellenecekler = epoch_karsilastirma_listesi | selectattr('d42_epoch', '>', 'smax_epoch') | list %}
-          Tüm ortak cihazlar:
           {% for item in epoch_karsilastirma_listesi %}
-          - name: {{ item.name }}
-            d42_last_updated: {{ item.d42_last_updated }}
-            d42_epoch: {{ item.d42_epoch }}
-            smax_last_update_time: {{ item.smax_last_update_time }}
-            smax_epoch: {{ item.smax_epoch }}
-          {% endfor %}
-
-          Güncellenecek cihazlar:
-          {% for item in guncellenecekler %}
-          - name: {{ item.name }}
-            d42_last_updated: {{ item.d42_last_updated }}
-            d42_epoch: {{ item.d42_epoch }}
-            smax_last_update_time: {{ item.smax_last_update_time }}
-            smax_epoch: {{ item.smax_epoch }}
+            Device: {{ item.name }}
+            Device42 last_updated: {{ item.d42_last_updated }}
+            Device42 epoch saniye: {{ item.d42_epoch }}
+            SMAX last_update_time: {{ item.smax_last_update_time }}
+            SMAX epoch saniye: {{ item.smax_epoch }}
+            ---
           {% endfor %}
 
     - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
