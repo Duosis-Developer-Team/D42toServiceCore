@@ -268,3 +268,55 @@
         label: "{{ item.entities[0].properties.HostName }}"
       register: smax_update_responses
 
+    - name: insert_payloads listesini başlat
+      set_fact:
+        insert_payloads: []
+
+    - name: Yeni yazdırılacak cihazlar için insert payloadlarını ekle
+      set_fact:
+        insert_payloads: "{{ insert_payloads + [ insert_payload ] }}"
+      vars:
+        clean_network_cards: >-
+          [{% for mac in item.mac_addresses | default([]) %}
+            {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "{{ mac.port_name | default('') }}", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
+          {% endfor %}]
+        insert_payload:
+          entities:
+            - entity_type: "Device"
+              properties:
+                SubType: "Server"
+                MemorySize: "{{ (item.ram | default(item.memory | default(0))) | int }}"
+                BiosSerialNumber: "{{ item.serial_no | default('') }}"
+                BiosUUID: "{{ item.uuid | default('') }}"
+                HostName: "{{ item.name | default('') }}"
+                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+                OsName: "{{ item.os | default('') }}"
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0 and (item.hdd_details | select('mapping') | list | length > 0)) | ternary((item.hdd_details | select('mapping') | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': clean_network_cards } | to_json }}"
+                Vendor: "{{ item.manufacturer | default('') }}"
+                Model: "{{ item.hw_model | default('') }}"
+                Environment: "{{ item.service_level | default('') }}"
+          operation: "CREATE"
+      loop: "{{ yeni_yazdirilacak_cihazlar }}"
+      loop_control:
+        loop_var: item
+
+    - name: Yeni yazdırılacak cihazları SMAX'e insert olarak gönder
+      uri:
+        url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
+        method: POST
+        headers:
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
+          Content-Type: "application/json"
+        body: "{{ item | to_json }}"
+        body_format: raw
+        status_code: 200,201,202
+        validate_certs: no
+        return_content: yes
+      loop: "{{ insert_payloads }}"
+      loop_control:
+        label: "{{ item.entities[0].properties.HostName }}"
+      register: smax_insert_responses
+
