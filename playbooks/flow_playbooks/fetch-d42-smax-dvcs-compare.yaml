@@ -158,8 +158,7 @@
           'd42_last_updated': item.d42_last_updated,
           'd42_epoch': (item.d42_epoch | int),
           'smax_last_update_time': item.smax_last_update_time,
-          'smax_epoch': (item.smax_epoch | int),
-          'd42_device': item.d42_device
+          'smax_epoch': (item.smax_epoch | int)
         } ] }}"
       loop: "{{ epoch_karsilastirma_listesi }}"
 
