@@ -253,7 +253,7 @@
 
     - name: Güncellenecek cihazları SMAX'e update olarak gönder
       uri:
-        url: "{{ smax_api_url }}"
+        url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
         method: POST
         headers:
           Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
