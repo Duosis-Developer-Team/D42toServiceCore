@@ -212,38 +212,40 @@
           Güncellenecek Cihazlar (LastUpdated karşılaştırmalı):
           {{ guncellenecek_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
 
-    - name: Güncellenecek cihazlar için update payloadlarını hazırla
+    - name: update_payloads listesini başlat
       set_fact:
-        update_payloads: >-
-          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
-          [
-          {% for device in guncellenecek_cihazlar %}
-            {% set smax = smax_dict[device.name] %}
-            {
-              "entities": [{
-                "entity_type": "Device",
-                "properties": {
-                  "SubType": "Server",
-                  "MemorySize": "{{ (device.ram | default(device.memory | default(0))) | int }}",
-                  "BiosSerialNumber": "{{ device.serial_no | default('') }}",
-                  "BiosUUID": "{{ device.uuid | default('') }}",
-                  "Id": "{{ smax.device_id | default(smax.id | default(smax.Id | default(''))) }}",
-                  "HostName": "{{ device.name | default('') }}",
-                  "D42id_c": "{{ device.device_id | default(device.id) | default('') }}",
-                  "OsName": "{{ device.os | default('') }}",
-                  "IpAddresses": "{{ {'IpAddress': [ { 'IpValue': (device.ip_addresses | default([]) | first | default({})).ip | default(device.ip_address | default(device.primary_ip | default(device.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}",
-                  "Cpus": "{{ {'Cpu': [ { 'CpuType': device.cpu_model | default(''), 'CpuVendor': device.cpu_vendor | default(''), 'CpuClockSpeed': (device.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': device.cpu_count | default(device.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}",
-                  "DiskDevices": "{{ {'DiskDevice': (device.hdd_details is defined and device.hdd_details is not none and device.hdd_details|length > 0) | ternary((device.hdd_details | map('combine', {'DiskName': device.name | default(''), 'DiskSize': device.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (device.name | default('')) + '_disk', 'DiskSize': device.hddsize | default(device.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}",
-                  "NetworkCards": "{{ {'NetworkCard': device.mac_addresses | default([]) | map('combine', {'MacAddress': '', 'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list | to_json }}",
-                  "Vendor": "{{ device.manufacturer | default('') }}",
-                  "Model": "{{ device.hw_model | default('') }}",
-                  "Environment": "{{ device.service_level | default('') }}"
-                }
-              }],
-              "operation": "UPDATE"
-            }{% if not loop.last %},{% endif %}
-          {% endfor %}
-          ]
+        update_payloads: []
+
+    - name: Güncellenecek cihazlar için update payloadlarını ekle
+      set_fact:
+        update_payloads: "{{ update_payloads + [payload] }}"
+      vars:
+        smax: "{{ smax_dict[item.name] }}"
+        payload:
+          entities:
+            - entity_type: "Device"
+              properties:
+                SubType: "Server"
+                MemorySize: "{{ (item.ram | default(item.memory | default(0))) | int }}"
+                BiosSerialNumber: "{{ item.serial_no | default('') }}"
+                BiosUUID: "{{ item.uuid | default('') }}"
+                Id: "{{ smax.device_id | default(smax.id | default(smax.Id | default(''))) }}"
+                HostName: "{{ item.name | default('') }}"
+                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+                OsName: "{{ item.os | default('') }}"
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0) | ternary((item.hdd_details | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': item.mac_addresses | default([]) | map('combine', {'MacAddress': '', 'NetworkCardSpeed': '', 'NetworkCardName': '', 'NetworkCardType': '', 'NetworkCardRole': '', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list | to_json }}"
+                Vendor: "{{ item.manufacturer | default('') }}"
+                Model: "{{ item.hw_model | default('') }}"
+                Environment: "{{ item.service_level | default('') }}"
+          operation: "UPDATE"
+      loop: "{{ guncellenecek_cihazlar }}"
+      loop_control:
+        loop_var: item
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
 
     - name: Güncellenecek cihazları SMAX'e update olarak gönder
       uri:
