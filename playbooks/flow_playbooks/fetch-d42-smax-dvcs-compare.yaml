@@ -128,26 +128,6 @@
       set_fact:
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
 
-    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
-      set_fact:
-        guncellenecek_cihazlar: >-
-          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
-          {% set common_names = d42_names | intersect(smax_names) %}
-          {% set result = [] %}
-          {% for d42_device in d42_devices %}
-            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
-              {% set smax_device = smax_dict.get(d42_device.name) %}
-              {% if smax_device and smax_device.last_update_time is defined %}
-                {% set d42_epoch = (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int %}
-                {% set smax_epoch = (smax_device.last_update_time | int // 1000) %}
-                {% if d42_epoch > smax_epoch %}
-                  {% set _ = result.append(d42_device) %}
-                {% endif %}
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-          {{ result }}
-
     - name: LastUpdated epoch değerlerini karşılaştırmalı olarak yazdır
       vars:
         smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
@@ -168,21 +148,25 @@
             {% endif %}
           {% endfor %}
 
-#    - name: Güncellenecek cihazlarda LastUpdated bilgilerini göster
-#      vars:
-#        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
-#      debug:
-#        msg: >-
-#          {% if guncellenecek_cihazlar is defined and guncellenecek_cihazlar | length > 0 %}
-#            {% for device in guncellenecek_cihazlar %}
-#            Cihaz: {{ device.name }}
-#            Device42 LastUpdated: {{ device.last_updated }}
-#            SMAX LastUpdateTime: {{ smax_dict[device.name].last_update_time | default('YOK') }}
-#            ---
-#            {% endfor %}
-#          {% else %}
-#            Güncellenecek cihaz bulunamadı
-#          {% endif %}
+    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
+      set_fact:
+        guncellenecek_cihazlar: >-
+          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) %}
+          {% set common_names = d42_names | intersect(smax_names) %}
+          {% set result = [] %}
+          {% for d42_device in d42_devices %}
+            {% if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
+              {% set smax_device = smax_dict.get(d42_device.name) %}
+              {% if smax_device and smax_device.last_update_time is defined %}
+                {% set d42_epoch = (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int %}
+                {% set smax_epoch = (smax_device.last_update_time | int // 1000) %}
+                {% if d42_epoch > smax_epoch %}
+                  {% set _ = result.append(d42_device) %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ result }}
 
     - name: Sonuçları göster
       debug:
