@@ -1,0 +1,159 @@
+---
+- name: Fetch Device42 devices with DBAG custom fields and add to SMAX inventory
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars input
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars input
+    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars input
+    smax_user: "{{ smax_user }}"  # AWX Extra Vars input
+    smax_pass: "{{ smax_pass }}"  # AWX Extra Vars input
+    smax_base_url: "{{ smax_base_url }}"  # AWX Extra Vars input
+    limit: "{{ limit | default(omit) }}"  # Opsiyonel limit değişkeni
+
+  pre_tasks:
+    - name: Build Device42 API URL with optional limit
+      set_fact:
+        device42_final_url: >-
+          {{ device42_api_url }}{% if limit is defined and limit|length > 0 %}?limit={{ limit }}{% endif %}
+
+  tasks:
+    - name: Fetch devices from Device42
+      uri:
+        url: "{{ device42_final_url }}"
+        method: GET
+        headers:
+          Authorization: "{{ device42_auth_header }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: device42_response
+
+    - name: Extract device list
+      set_fact:
+        devices: "{{ device42_response.json.Devices | default(device42_response.json.devices) }}"
+
+    - name: Filter devices with DBAG custom fields
+      set_fact:
+        dbag_devices: "{{ devices | selectattr('custom_fields', 'defined') | selectattr('custom_fields', 'ne', []) | select('json_query', '[?custom_fields[?contains(key, `dbag`)]]') | list }}"
+
+    - name: Show filtered DBAG devices count
+      debug:
+        msg: "Found {{ dbag_devices | length }} devices with DBAG custom fields out of {{ devices | length }} total devices"
+
+    - name: Extract IP addresses from DBAG devices
+      set_fact:
+        dbag_device_ips: "{{ dbag_devices | map('combine', {'extracted_ips': (item.ip_addresses | default([]) | map(attribute='ip') | list) + [item.ip_address | default('')] + [item.primary_ip | default('')] | select('string') | unique | list}) | list }}"
+
+    - name: Show extracted IP addresses
+      debug:
+        msg: |
+          Device: {{ item.name }}
+          IP Addresses: {{ item.extracted_ips }}
+      loop: "{{ dbag_device_ips }}"
+      when: dbag_device_ips is defined
+
+    - name: Get SMAX token
+      uri:
+        url: "{{ smax_token_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ { 'Login': smax_user, 'Password': smax_pass } | to_json }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_token_response
+
+    - name: Extract SMAX token
+      set_fact:
+        smax_token: "{{ smax_token_response.content }}"
+      register: token_extraction_result
+      ignore_errors: yes
+
+    - name: Fail if token extraction failed
+      fail:
+        msg: "Failed to extract token from SMAX response. Response content: {{ smax_token_response.content }}"
+      when: token_extraction_result is failed
+
+    - name: Get existing DBAG inventory from SMAX
+      uri:
+        url: "{{ smax_base_url }}/api/odata/bulk/Inventory"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ smax_token }}"
+          Content-Type: "application/json"
+        return_content: yes
+        status_code: [200, 404]
+        validate_certs: no
+      register: smax_inventory_response
+
+    - name: Check if DBAG inventory exists
+      set_fact:
+        dbag_inventory_exists: "{{ smax_inventory_response.json.value | selectattr('Name', 'equalto', 'dbag') | list | length > 0 }}"
+      when: smax_inventory_response.status == 200
+
+    - name: Create DBAG inventory if it doesn't exist
+      uri:
+        url: "{{ smax_base_url }}/api/odata/bulk/Inventory"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ smax_token }}"
+          Content-Type: "application/json"
+        body: |
+          {
+            "Name": "dbag",
+            "Description": "DBAG devices from Device42",
+            "Type": "Host"
+          }
+        return_content: yes
+        status_code: [200, 201]
+        validate_certs: no
+      register: create_inventory_response
+      when: not dbag_inventory_exists | default(true)
+
+    - name: Get DBAG inventory ID
+      set_fact:
+        dbag_inventory_id: "{{ (smax_inventory_response.json.value | selectattr('Name', 'equalto', 'dbag') | first).Id | default((create_inventory_response.json.Id | default(''))) }}"
+      when: smax_inventory_response.status == 200 or create_inventory_response is defined
+
+    - name: Show DBAG inventory ID
+      debug:
+        msg: "DBAG Inventory ID: {{ dbag_inventory_id }}"
+
+    - name: Add IP addresses to DBAG inventory hosts
+      uri:
+        url: "{{ smax_base_url }}/api/odata/bulk/InventoryHost"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ smax_token }}"
+          Content-Type: "application/json"
+        body: |
+          {
+            "InventoryId": "{{ dbag_inventory_id }}",
+            "HostName": "{{ item }}",
+            "Description": "Added from Device42 DBAG devices"
+          }
+        return_content: yes
+        status_code: [200, 201]
+        validate_certs: no
+      register: add_host_response
+      loop: "{{ dbag_device_ips | map(attribute='extracted_ips') | flatten | unique | list }}"
+      when: dbag_inventory_id is defined and dbag_device_ips is defined
+
+    - name: Show summary of added hosts
+      debug:
+        msg: |
+          Successfully processed {{ dbag_devices | length }} DBAG devices
+          Added {{ dbag_device_ips | map(attribute='extracted_ips') | flatten | unique | list | length }} unique IP addresses to DBAG inventory
+          DBAG Inventory ID: {{ dbag_inventory_id }}
+
+    - name: Show detailed results
+      debug:
+        msg: |
+          Device: {{ item.name }}
+          IP Addresses: {{ item.extracted_ips }}
+          Status: Added to DBAG inventory
+      loop: "{{ dbag_device_ips }}"
+      when: dbag_device_ips is defined 
