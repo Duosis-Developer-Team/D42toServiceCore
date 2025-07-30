@@ -1,0 +1,45 @@
+---
+- name: Device42'dan cihaz çek ve dbag inventory'sine ekle
+  hosts: localhost
+  gather_facts: false
+  vars:
+    device42_api_url: "https://device42.example.com/api/1.0/devices/all/"
+    device42_username: "kullanici_adi"
+    device42_password: "sifre"
+    awx_api_url: "https://awx.example.com/api/v2"
+    awx_token: "AWX_TOKENINIZ"
+    dbag_inventory_id: 5  # dbag inventory'nin id'si (AWX'den öğrenebilirsin)
+  tasks:
+    - name: Device42'dan cihazları çek
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        user: "{{ device42_username }}"
+        password: "{{ device42_password }}"
+        force_basic_auth: yes
+        return_content: yes
+        validate_certs: no
+      register: d42_response
+
+    - name: dbag custom field'ı olan cihazları ve ip'lerini bul
+      set_fact:
+        dbag_hosts: >-
+          {{
+            d42_response.json.Devices
+            | selectattr('custom_fields', 'defined')
+            | selectattr('custom_fields', 'select', lambda fields: fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0)
+            | map(attribute='ip_addresses')
+            | map('map', attribute='ip')  # ip_addresses içindeki ip'leri al
+            | sum(start=[])
+            | unique
+          }}
+
+    - name: dbag inventory'sine host ekle
+      awx.awx.inventory_host:
+        hostname: "{{ item }}"
+        inventory: "{{ dbag_inventory_id }}"
+        controller_host: "{{ awx_api_url }}"
+        controller_oauthtoken: "{{ awx_token }}"
+        validate_certs: no
+      loop: "{{ dbag_hosts }}"
+      when: dbag_hosts | length > 0 
