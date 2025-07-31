@@ -11,6 +11,10 @@
     awx_token: "{{ awx_token }}"
     dbag_inventory_id: "{{ dbag_inventory_id }}"
   tasks:
+    - name: AWX API URL'sini debug et
+      debug:
+        msg: "AWX API URL: {{ awx_api_url }}"
+
     - name: Device42'dan cihazları çek
       uri:
         url: "{{ device42_api_url }}"
@@ -38,6 +42,10 @@
       set_fact:
         dbag_hosts: "{{ dbag_hosts | unique }}"
 
+    - name: Bulunan IP'leri debug et
+      debug:
+        msg: "DBAG IP'leri: {{ dbag_hosts }}"
+
     - name: dbag inventory'sine host ekle
       uri:
         url: "{{ awx_api_url }}/inventories/{{ dbag_inventory_id }}/hosts/"
@@ -51,5 +59,6 @@
           inventory: "{{ dbag_inventory_id }}"
         status_code: [201, 409]  # 409 = zaten var
         validate_certs: no
+        timeout: 30
       loop: "{{ dbag_hosts }}"
       when: dbag_hosts | length > 0 
