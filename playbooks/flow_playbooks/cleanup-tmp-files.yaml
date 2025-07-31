@@ -1,0 +1,68 @@
+---
+- name: Webhook ile gelen alert'e göre tmp dosyalarını temizle
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # Webhook payload'dan gelen değişkenler
+    event_name: "{{ event_name }}"
+    host_name: "{{ host_name }}"
+    host_ip: "{{ host_ip }}"
+  tasks:
+    - name: Webhook payload'ını debug et
+      debug:
+        msg: 
+          - "Event: {{ event_name }}"
+          - "Host: {{ host_name }}"
+          - "IP: {{ host_ip }}"
+
+    - name: Host'un variable'larını al
+      set_fact:
+        target_host: "{{ host_name }}"
+        server_ip: "{{ host_ip }}"
+        server_username: "duosis"
+        server_password: "Qwerasdf1234"
+
+    - name: Hedef sunucuya bağlan ve tmp dosyalarını temizle
+      block:
+        - name: /tmp dizinindeki dosyaları listele
+          file:
+            path: /tmp
+            state: directory
+          register: tmp_dir_info
+
+        - name: /tmp dizinindeki tüm dosyaları sil
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop: "{{ tmp_dir_files.files }}"
+          vars:
+            tmp_dir_files: "{{ lookup('fileglob', '/tmp/*', wantlist=True) | map('basename') | list }}"
+          when: tmp_dir_files | length > 0
+
+        - name: /tmp dizinindeki tüm dizinleri sil
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop: "{{ tmp_dir_dirs.dirs }}"
+          vars:
+            tmp_dir_dirs: "{{ lookup('fileglob', '/tmp/*/', wantlist=True) | map('basename') | list }}"
+          when: tmp_dir_dirs | length > 0
+
+        - name: Temizlik sonrası /tmp dizinini kontrol et
+          command: ls -la /tmp
+          register: tmp_cleanup_result
+
+        - name: Temizlik sonucunu raporla
+          debug:
+            msg: 
+              - "Temizlik tamamlandı!"
+              - "Kalan dosyalar: {{ tmp_cleanup_result.stdout_lines }}"
+
+      delegate_to: "{{ target_host }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_host: "{{ server_ip }}"
+        ansible_user: "{{ server_username }}"
+        ansible_password: "{{ server_password }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no' 
