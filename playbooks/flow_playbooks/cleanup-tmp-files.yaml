@@ -2,18 +2,13 @@
 - name: Webhook ile gelen alert'e göre tmp dosyalarını temizle
   hosts: localhost
   gather_facts: false
-  vars:
-    # Webhook payload'dan gelen değişkenler
-    event_name: "{{ event_name }}"
-    host_name: "{{ host_name }}"
-    host_ip: "{{ host_ip }}"
   tasks:
     - name: Webhook payload'ını debug et
       debug:
         msg: 
-          - "Event: {{ event_name }}"
-          - "Host: {{ host_name }}"
-          - "IP: {{ host_ip }}"
+          - "Event: {{ event_name | default('Bilinmiyor') }}"
+          - "Host: {{ host_name | default('Bilinmiyor') }}"
+          - "IP: {{ host_ip | default('Bilinmiyor') }}"
 
     - name: Host'un variable'larını al
       set_fact:
