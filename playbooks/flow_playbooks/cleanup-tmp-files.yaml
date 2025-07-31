@@ -16,6 +16,17 @@
         server_ip: "{{ host_ip }}"
         server_username: "duosis"
         server_password: "Qwerasdf1234"
+        ssh_port: "{{ ssh_port | default(22) }}"
+
+    - name: Hedef sunucuya bağlantıyı test et
+      ping:
+      delegate_to: "{{ target_host }}"
+      vars:
+        ansible_host: "{{ server_ip }}"
+        ansible_user: "{{ server_username }}"
+        ansible_password: "{{ server_password }}"
+        ansible_port: "{{ ssh_port }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30'
 
     - name: Hedef sunucuya bağlan ve tmp dosyalarını temizle
       block:
@@ -60,4 +71,5 @@
         ansible_host: "{{ server_ip }}"
         ansible_user: "{{ server_username }}"
         ansible_password: "{{ server_password }}"
-        ansible_ssh_common_args: '-o StrictHostKeyChecking=no' 
+        ansible_port: "{{ ssh_port }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30' 
