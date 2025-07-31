@@ -3,12 +3,13 @@
   hosts: localhost
   gather_facts: false
   vars:
-    device42_api_url: "https://device42.example.com/api/1.0/devices/all/"
-    device42_username: "admin"
-    device42_password: "Aa123456."
-    awx_api_url: "https://awx.example.com/api/v2"
-    awx_token: "4536bvXZZS4G3yV0clW2MLGblBsZti"
-    dbag_inventory_id: 5  # dbag inventory'nin id'si (AWX'den öğrenebilirsin)
+    # Bu değişkenler AWX'den gelecek
+    device42_api_url: "{{ device42_api_url }}"
+    device42_username: "{{ device42_username }}"
+    device42_password: "{{ device42_password }}"
+    awx_api_url: "{{ awx_api_url }}"
+    awx_token: "{{ awx_token }}"
+    dbag_inventory_id: "{{ dbag_inventory_id }}"
   tasks:
     - name: Device42'dan cihazları çek
       uri:
