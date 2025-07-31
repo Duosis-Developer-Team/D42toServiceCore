@@ -15,6 +15,20 @@
       debug:
         msg: "AWX API URL: {{ awx_api_url }}"
 
+    - name: AWX API bağlantısını test et
+      uri:
+        url: "{{ awx_api_url }}/ping/"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ awx_token }}"
+        validate_certs: no
+        timeout: 30
+      register: awx_ping_result
+
+    - name: AWX API test sonucunu göster
+      debug:
+        var: awx_ping_result
+
     - name: Device42'dan cihazları çek
       uri:
         url: "{{ device42_api_url }}"
