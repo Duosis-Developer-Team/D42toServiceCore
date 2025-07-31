@@ -22,18 +22,21 @@
         validate_certs: no
       register: d42_response
 
+    - name: dbag custom field'ı olan cihazları filtrele
+      set_fact:
+        dbag_devices: "{{ d42_response.json.Devices | selectattr('custom_fields', 'defined') | list }}"
+
     - name: dbag custom field'ı olan cihazları ve ip'lerini bul
       set_fact:
-        dbag_hosts: >-
-          {{
-            d42_response.json.Devices
-            | selectattr('custom_fields', 'defined')
-            | selectattr('custom_fields', 'select', lambda fields: fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0)
-            | map(attribute='ip_addresses')
-            | map('map', attribute='ip')
-            | sum(start=[])
-            | unique
-          }}
+        dbag_hosts: "{{ dbag_hosts | default([]) + (item.ip_addresses | map(attribute='ip') | list) }}"
+      loop: "{{ dbag_devices }}"
+      when: >
+        item.custom_fields is defined and
+        item.custom_fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0
+
+    - name: dbag_hosts listesini unique yap
+      set_fact:
+        dbag_hosts: "{{ dbag_hosts | unique }}"
 
     - name: dbag inventory'sine host ekle
       uri:
