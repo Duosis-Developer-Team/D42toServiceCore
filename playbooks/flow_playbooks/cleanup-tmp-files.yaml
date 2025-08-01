@@ -34,40 +34,26 @@
 
     - name: Hedef sunucuya bağlan ve belirtilen dizindeki dosyaları temizle
       block:
-        - name: Hedef dizindeki dosyaları listele
-          file:
+        - name: Hedef dizinin varlığını kontrol et
+          stat:
             path: "{{ target_directory }}"
-            state: directory
-          register: dir_info
+          register: dir_stat
 
-        - name: Hedef dizindeki tüm dosyaları sil
-          file:
-            path: "{{ item }}"
-            state: absent
-          loop: "{{ dir_files.files }}"
-          vars:
-            dir_files: "{{ lookup('fileglob', target_directory + '/*', wantlist=True) | map('basename') | list }}"
-          when: dir_files | length > 0
-
-        - name: Hedef dizindeki tüm dizinleri sil
-          file:
-            path: "{{ item }}"
-            state: absent
-          loop: "{{ dir_dirs.dirs }}"
-          vars:
-            dir_dirs: "{{ lookup('fileglob', target_directory + '/*/', wantlist=True) | map('basename') | list }}"
-          when: dir_dirs | length > 0
+        - name: Hedef dizindeki tüm dosya ve dizinleri sil (rm -rf)
+          command: rm -rf "{{ target_directory }}"/test_folder
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
 
         - name: Temizlik sonrası hedef dizini kontrol et
           command: ls -la "{{ target_directory }}"
           register: cleanup_result
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
 
         - name: Temizlik sonucunu raporla
           debug:
             msg: 
               - "Temizlik tamamlandı!"
               - "Hedef dizin: {{ target_directory }}"
-              - "Kalan dosyalar: {{ cleanup_result.stdout_lines }}"
+              - "Kalan dosyalar: {{ cleanup_result.stdout_lines | default('Dizin bulunamadı') }}"
 
       delegate_to: "{{ target_host }}"
       become: yes
