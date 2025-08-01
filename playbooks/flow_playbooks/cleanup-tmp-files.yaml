@@ -1,7 +1,10 @@
 ---
-- name: Webhook ile gelen alert'e göre tmp dosyalarını temizle
+- name: Webhook ile gelen alert'e göre belirtilen dizindeki dosyaları temizle
   hosts: localhost
   gather_facts: false
+  vars:
+    # Silinecek dizin yolu - AWX'den değiştirilebilir
+    target_directory: "{{ target_directory | default('/test') }}"
   tasks:
     - name: Webhook payload'ını debug et
       debug:
@@ -9,6 +12,7 @@
           - "Event: {{ event_name | default('Bilinmiyor') }}"
           - "Host: {{ host_name | default('Bilinmiyor') }}"
           - "IP: {{ host_ip | default('Bilinmiyor') }}"
+          - "Hedef Dizin: {{ target_directory }}"
 
     - name: Host'un variable'larını al
       set_fact:
@@ -28,41 +32,42 @@
         ansible_port: "{{ ssh_port }}"
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30'
 
-    - name: Hedef sunucuya bağlan ve tmp dosyalarını temizle
+    - name: Hedef sunucuya bağlan ve belirtilen dizindeki dosyaları temizle
       block:
-        - name: /tmp dizinindeki dosyaları listele
+        - name: Hedef dizindeki dosyaları listele
           file:
-            path: /tmp
+            path: "{{ target_directory }}"
             state: directory
-          register: tmp_dir_info
+          register: dir_info
 
-        - name: /tmp dizinindeki tüm dosyaları sil
+        - name: Hedef dizindeki tüm dosyaları sil
           file:
             path: "{{ item }}"
             state: absent
-          loop: "{{ tmp_dir_files.files }}"
+          loop: "{{ dir_files.files }}"
           vars:
-            tmp_dir_files: "{{ lookup('fileglob', '/tmp/*', wantlist=True) | map('basename') | list }}"
-          when: tmp_dir_files | length > 0
+            dir_files: "{{ lookup('fileglob', target_directory + '/*', wantlist=True) | map('basename') | list }}"
+          when: dir_files | length > 0
 
-        - name: /tmp dizinindeki tüm dizinleri sil
+        - name: Hedef dizindeki tüm dizinleri sil
           file:
             path: "{{ item }}"
             state: absent
-          loop: "{{ tmp_dir_dirs.dirs }}"
+          loop: "{{ dir_dirs.dirs }}"
           vars:
-            tmp_dir_dirs: "{{ lookup('fileglob', '/tmp/*/', wantlist=True) | map('basename') | list }}"
-          when: tmp_dir_dirs | length > 0
+            dir_dirs: "{{ lookup('fileglob', target_directory + '/*/', wantlist=True) | map('basename') | list }}"
+          when: dir_dirs | length > 0
 
-        - name: Temizlik sonrası /tmp dizinini kontrol et
-          command: ls -la /tmp
-          register: tmp_cleanup_result
+        - name: Temizlik sonrası hedef dizini kontrol et
+          command: ls -la "{{ target_directory }}"
+          register: cleanup_result
 
         - name: Temizlik sonucunu raporla
           debug:
             msg: 
               - "Temizlik tamamlandı!"
-              - "Kalan dosyalar: {{ tmp_cleanup_result.stdout_lines }}"
+              - "Hedef dizin: {{ target_directory }}"
+              - "Kalan dosyalar: {{ cleanup_result.stdout_lines }}"
 
       delegate_to: "{{ target_host }}"
       become: yes
