@@ -6,6 +6,17 @@
     # Silinecek dizin yolu - AWX'den değiştirilebilir
     target_directory: "{{ target_directory | default('/test') }}"
   tasks:
+    - name: Tüm gelen değişkenleri debug et
+      debug:
+        msg: 
+          - "=== WEBHOOK PAYLOAD DEBUG ==="
+          - "Event Name: {{ event_name | default('TANIMSIZ') }}"
+          - "Event ID: {{ event_id | default('TANIMSIZ') }}"
+          - "Host Name: {{ host_name | default('TANIMSIZ') }}"
+          - "Host IP: {{ host_ip | default('TANIMSIZ') }}"
+          - "Target Directory: {{ target_directory | default('TANIMSIZ') }}"
+          - "=== PAYLOAD SONU ==="
+
     - name: Webhook payload'ını debug et
       debug:
         msg: 
