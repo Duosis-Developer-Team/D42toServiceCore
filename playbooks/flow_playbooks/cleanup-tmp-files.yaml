@@ -10,6 +10,7 @@
       debug:
         msg: 
           - "Event: {{ event_name | default('Bilinmiyor') }}"
+          - "Event ID: {{ event_id | default('Bilinmiyor') }}"
           - "Host: {{ host_name | default('Bilinmiyor') }}"
           - "IP: {{ host_ip | default('Bilinmiyor') }}"
           - "Hedef Dizin: {{ target_directory }}"
@@ -40,7 +41,7 @@
           register: dir_stat
 
         - name: Hedef dizindeki tüm dosya ve dizinleri sil (rm -rf)
-          command: rm -rf "{{ target_directory }}"/test_folder
+          command: rm -rf "{{ target_directory }}"
           when: dir_stat.stat.exists and dir_stat.stat.isdir
 
         - name: Temizlik sonrası hedef dizini kontrol et
