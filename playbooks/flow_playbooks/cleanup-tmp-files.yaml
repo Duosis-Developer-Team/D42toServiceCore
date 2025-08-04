@@ -51,9 +51,14 @@
             path: "{{ target_directory }}"
           register: dir_stat
 
-        - name: Hedef dizindeki tüm dosya ve dizinleri sil (rm -rf)
-          command: rm -rf "{{ target_directory }}"
+        - name: Hedef dizinin içindeki tüm dosya ve dizinleri sil (dizini koru)
+          command: rm -rf "{{ target_directory }}"/*
           when: dir_stat.stat.exists and dir_stat.stat.isdir
+
+        - name: Gizli dosyaları da sil (. ile başlayan dosyalar)
+          command: rm -rf "{{ target_directory }}"/.[!.]*
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
+          ignore_errors: yes
 
         - name: Temizlik sonrası hedef dizini kontrol et
           command: ls -la "{{ target_directory }}"
@@ -65,7 +70,7 @@
             msg: 
               - "Temizlik tamamlandı!"
               - "Hedef dizin: {{ target_directory }}"
-              - "Kalan dosyalar: {{ cleanup_result.stdout_lines | default('Dizin bulunamadı') }}"
+              - "Dizin içeriği: {{ cleanup_result.stdout_lines | default('Dizin bulunamadı') }}"
 
       delegate_to: "{{ target_host }}"
       become: yes
