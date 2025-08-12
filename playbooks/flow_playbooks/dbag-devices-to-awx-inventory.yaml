@@ -1,21 +1,33 @@
 ---
-- name: Device42'dan cihaz çek ve dbag inventory'sine ekle
+- name: Fetch devices from Device42 and add IPv4 hosts to AWX inventories by custom field names
   hosts: localhost
   gather_facts: false
   vars:
-    # Bu değişkenler AWX'den gelecek
+    # These variables are expected from AWX (extra_vars)
     device42_api_url: "{{ device42_api_url }}"
     device42_username: "{{ device42_username }}"
     device42_password: "{{ device42_password }}"
-    awx_api_url: "{{ awx_api_url }}"
+    awx_api_url: "{{ awx_api_url }}"           # e.g., https://awx.example.com/api/v2
     awx_token: "{{ awx_token }}"
-    dbag_inventory_id: "{{ dbag_inventory_id }}"
-  tasks:
-    - name: AWX API URL'sini debug et
-      debug:
-        msg: "AWX API URL: {{ awx_api_url }}"
+    awx_organization_id: "{{ awx_organization_id }}"  # Required to create inventories
+    custom_field_names_csv: "{{ custom_field_names_csv }}" # e.g., "dbag,critical,internal"
 
-    - name: AWX API bağlantısını test et
+    # Derived variables
+    target_custom_field_names: >-
+      {{ (custom_field_names_csv | default('') | split(','))
+          | map('regex_replace', '^\s+|\s+$', '')
+          | select('ne', '')
+          | list }}
+    target_custom_field_names_lower: >-
+      {{ target_custom_field_names | map('lower') | list }}
+  tasks:
+    - name: Debug AWX API URL and target custom field names (lower)
+      debug:
+        msg:
+          - "AWX API URL: {{ awx_api_url }}"
+          - "Target custom fields (lower): {{ target_custom_field_names_lower }}"
+
+    - name: Test connectivity to AWX API
       uri:
         url: "{{ awx_api_url }}/ping/"
         method: GET
@@ -25,11 +37,11 @@
         timeout: 30
       register: awx_ping_result
 
-    - name: AWX API test sonucunu göster
+    - name: Show AWX API ping result
       debug:
         var: awx_ping_result
 
-    - name: Device42'dan cihazları çek
+    - name: Fetch devices from Device42
       uri:
         url: "{{ device42_api_url }}"
         method: GET
@@ -40,39 +52,64 @@
         validate_certs: no
       register: d42_response
 
-    - name: dbag custom field'ı olan cihazları filtrele
+    - name: Prepare Device42 devices list (only those with custom_fields)
       set_fact:
-        dbag_devices: "{{ d42_response.json.Devices | selectattr('custom_fields', 'defined') | list }}"
+        d42_devices: "{{ d42_response.json.Devices | default([]) | selectattr('custom_fields', 'defined') | list }}"
 
-    - name: dbag custom field'ı olan cihazları ve ip'lerini bul
+    - name: Initialize inventory_name -> IPv4 hosts map
       set_fact:
-        dbag_hosts: "{{ dbag_hosts | default([]) + (item.ip_addresses | map(attribute='ip') | list) }}"
-      loop: "{{ dbag_devices }}"
-      when: >
-        item.custom_fields is defined and
-        item.custom_fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0
+        inventory_name_to_hosts: {}
 
-    - name: dbag_hosts listesini unique yap
+    - name: Build IPv4 host lists for all target custom field names (exact, case-insensitive)
       set_fact:
-        dbag_hosts: "{{ dbag_hosts | unique }}"
+        inventory_name_to_hosts: >-
+          {{ inventory_name_to_hosts | combine({ inv_name: (((inventory_name_to_hosts[inv_name] | default([]))
+            + (dev.ip_addresses | default([]) | map(attribute='ip')
+                | select('match', '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$') | list)) | unique) }) }}
+      vars:
+        dev: "{{ item.0 }}"
+        inv_name: "{{ item.1 }}"
+      loop: "{{ d42_devices | product(target_custom_field_names_lower) | list }}"
+      when:
+        - dev.custom_fields is defined
+        - inv_name in (dev.custom_fields | map(attribute='key') | map('lower') | list)
 
-    - name: Bulunan IP'leri debug et
+    - name: Summary debug - inventory_name_to_hosts
       debug:
-        msg: "DBAG IP'leri: {{ dbag_hosts }}"
+        var: inventory_name_to_hosts
 
-    - name: dbag inventory'sine host ekle
+    - name: Initialize inventory_name -> ID map
+      set_fact:
+        inventory_name_to_id: {}
+
+    - name: For each inventory name, ensure inventory exists in AWX (search or create)
+      include_tasks: helpers/get_or_create_inventory.yml
+      loop: "{{ inventory_name_to_hosts.keys() | list }}"
+      loop_control:
+        loop_var: inventory_name
+
+    - name: Summary debug - inventory_name_to_id
+      debug:
+        var: inventory_name_to_id
+
+    - name: Add IPv4 hosts to each inventory
       uri:
-        url: "{{ awx_api_url }}/inventories/{{ dbag_inventory_id }}/hosts/"
+        url: "{{ awx_api_url }}/inventories/{{ inventory_id }}/hosts/"
         method: POST
         headers:
           Authorization: "Bearer {{ awx_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          name: "{{ item }}"
-          inventory: "{{ dbag_inventory_id }}"
-        status_code: [201, 409]  # 409 = zaten var
+          name: "{{ host_ip }}"
+          inventory: "{{ inventory_id }}"
+        status_code: [201, 409]
         validate_certs: no
         timeout: 30
-      loop: "{{ dbag_hosts }}"
-      when: dbag_hosts | length > 0 
+      loop: "{{ query('subelements', inventory_name_to_hosts | dict2items, 'value') }}"
+      loop_control:
+        loop_var: pair
+      vars:
+        inventory_name: "{{ pair.0.key }}"
+        inventory_id: "{{ inventory_name_to_id[inventory_name] }}"
+        host_ip: "{{ pair.1 }}"

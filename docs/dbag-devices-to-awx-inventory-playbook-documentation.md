@@ -1,8 +1,8 @@
-# DBAG Devices to AWX Inventory Playbook Documentation
+# Dynamic Custom-Field Devices to AWX Inventory Playbook Documentation
 
 ## Genel Bakış
 
-Bu playbook, Device42'dan cihaz bilgilerini çekerek, "dbag" custom field'ına sahip cihazların IP adreslerini AWX (Ansible Automation Platform) inventory'sine otomatik olarak ekler. Bu sayede Device42'daki cihaz yönetimi ile AWX'inventory yönetimi arasında otomatik senkronizasyon sağlanır.
+Bu playbook, Device42'dan cihazları çekerek, verilen custom field isimlerine (CSV) tam eşleşme ve case-insensitive olarak uyan cihazların yalnızca IPv4 adreslerini, AWX'te aynı isimli envanterlere ekler. Envanterler yoksa ilgili organization altında otomatik oluşturulur.
 
 ## Playbook Dosyası
 - **Dosya Adı**: `dbag-devices-to-awx-inventory.yaml`
@@ -42,8 +42,8 @@ Device42 API'sine bağlanarak tüm cihaz bilgilerini çeker:
   register: d42_response
 ```
 
-### 3. DBAG Custom Field Filtreleme
-Device42'dan gelen cihazlar arasından "dbag" custom field'ına sahip olanları filtreler:
+### 3. Custom Field Filtreleme ve IPv4 Toplama
+`custom_field_names_csv` içinde verilen isimler için (örn: "dbag,critical,internal") tam eşleşme (case-insensitive) uygulanır ve eşleşen cihazların yalnız IPv4'leri toplanır. Her isim, AWX'te aynı isimdeki envantere karşılık gelir.
 
 ```yaml
 - name: dbag custom field'ı olan cihazları filtrele
@@ -64,8 +64,8 @@ DBAG custom field'ına sahip cihazların IP adreslerini toplar:
     item.custom_fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0
 ```
 
-### 5. Unique IP Listesi Oluşturma
-Aynı IP'lerin tekrarlanmasını önlemek için unique liste oluşturur:
+### 4. Unique IPv4 Listeleri Oluşturma
+Her envanter adı için IP listeleri tekilleştirilir.
 
 ```yaml
 - name: dbag_hosts listesini unique yap
@@ -73,8 +73,8 @@ Aynı IP'lerin tekrarlanmasını önlemek için unique liste oluşturur:
     dbag_hosts: "{{ dbag_hosts | unique }}"
 ```
 
-### 6. AWX Inventory'ye Host Ekleme
-Bulunan IP adreslerini AWX inventory'sine ekler:
+### 5. Envanter Oluştur/Var Olanı Kullan ve Host Ekle
+Her isim için önce AWX'te envanter araması yapılır (`/inventories/?name=<name>&organization=<orgId>`). Yoksa oluşturulur (`POST /inventories`). Ardından ilgili IPv4'ler `POST /inventories/{id}/hosts/` ile eklenir (201/409 kabul edilir).
 
 ```yaml
 - name: dbag inventory'sine host ekle
@@ -101,9 +101,10 @@ Bulunan IP adreslerini AWX inventory'sine ekler:
 - `device42_api_url`: Device42 API endpoint URL'i
 - `device42_username`: Device42 kullanıcı adı
 - `device42_password`: Device42 şifresi
-- `awx_api_url`: AWX API endpoint URL'i
+- `awx_api_url`: AWX API endpoint URL'i (örn: `https://awx.example.com/api/v2`)
 - `awx_token`: AWX API token'ı
-- `dbag_inventory_id`: AWX'deki hedef inventory ID'si
+- `awx_organization_id`: AWX Organization ID (envanter oluşturma için)
+- `custom_field_names_csv`: Virgülle ayrılmış custom field isimleri (örn: "dbag,critical,internal")
 
 ## API Entegrasyonları
 
@@ -114,19 +115,20 @@ Bulunan IP adreslerini AWX inventory'sine ekler:
 - **Response**: JSON formatında cihaz listesi
 
 ### AWX API
-- **Ping Endpoint**: `{{ awx_api_url }}/ping/`
-- **Hosts Endpoint**: `{{ awx_api_url }}/inventories/{{ dbag_inventory_id }}/hosts/`
-- **Authentication**: Bearer Token
-- **Method**: GET (ping), POST (host ekleme)
+- **Ping**: `{{ awx_api_url }}/ping/`
+- **Inventory Search**: `{{ awx_api_url }}/inventories/?name=<name>&organization=<orgId>`
+- **Inventory Create**: `{{ awx_api_url }}/inventories/`
+- **Hosts Create**: `{{ awx_api_url }}/inventories/<id>/hosts/`
+- **Auth**: Bearer Token
 
 ## Filtreleme Mantığı
 
-### DBAG Custom Field Kontrolü
+### Custom Field Kontrolü
 Playbook, Device42'daki cihazların custom field'larını kontrol eder ve şu kriterlere uyanları seçer:
 
-1. **Custom Fields Varlığı**: Cihazın custom_fields özelliği tanımlı olmalı
-2. **DBAG Pattern**: Custom field key'i "dbag" ile başlamalı (case-insensitive)
-3. **IP Adresi Varlığı**: Cihazın en az bir IP adresi olmalı
+1. **Custom Fields Varlığı**: Cihazın `custom_fields` özelliği tanımlı olmalı.
+2. **Tam Eşleşme (Case-Insensitive)**: `custom_fields[].key | lower` içinde hedef isim `lower` haliyle bulunmalı.
+3. **IPv4**: `ip_addresses[].ip` sadece IPv4 regex'ine uyanlar alınır.
 
 ### Örnek Filtreleme
 ```json
@@ -177,25 +179,26 @@ Bu örnekte sadece "Server01" DBAG custom field'ına sahip olduğu için seçili
 ## Kullanım Senaryoları
 
 ### 1. AWX Template ile Çalıştırma
-```bash
-# AWX'de template oluşturulur ve aşağıdaki değişkenler tanımlanır:
+```yaml
 device42_api_url: "https://device42.company.com/api/1.0/devices/"
 device42_username: "api_user"
 device42_password: "api_password"
 awx_api_url: "https://awx.company.com/api/v2"
 awx_token: "your_awx_token"
-dbag_inventory_id: "123"
+awx_organization_id: 42
+custom_field_names_csv: "dbag,critical,internal"
 ```
 
 ### 2. Manuel Çalıştırma
 ```bash
-ansible-playbook dbag-devices-to-awx-inventory.yaml \
+ansible-playbook playbooks/flow_playbooks/dbag-devices-to-awx-inventory.yaml \
   -e "device42_api_url=https://device42.company.com/api/1.0/devices/" \
   -e "device42_username=api_user" \
   -e "device42_password=api_password" \
   -e "awx_api_url=https://awx.company.com/api/v2" \
   -e "awx_token=your_awx_token" \
-  -e "dbag_inventory_id=123"
+  -e "awx_organization_id=42" \
+  -e "custom_field_names_csv=dbag,critical,internal"
 ```
 
 ### 3. Scheduled Job
@@ -305,6 +308,7 @@ curl -u username:password https://device42.company.com/api/1.0/devices/
 
 ## İlgili Dosyalar
 - `playbooks/flow_playbooks/dbag-devices-to-awx-inventory.yaml`: Ana playbook dosyası
+- `playbooks/flow_playbooks/helpers/get_or_create_inventory.yml`: Envanter arama/oluşturma yardımcı görevleri
 - AWX Template: AWX'de template konfigürasyonu
 - Device42 API Documentation: Device42 API referansı
 - AWX API Documentation: AWX API referansı 

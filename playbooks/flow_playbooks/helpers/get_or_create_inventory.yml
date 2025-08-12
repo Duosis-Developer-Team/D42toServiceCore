@@ -1,0 +1,32 @@
+---
+- name: AWX'te envanteri ara ({{ inventory_name }})
+  uri:
+    url: "{{ awx_api_url }}/inventories/?name={{ inventory_name | urlencode }}&organization={{ awx_organization_id | urlencode }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ awx_token }}"
+    validate_certs: no
+    timeout: 30
+  register: awx_inventory_search
+
+- name: Envanter yoksa oluştur ({{ inventory_name }})
+  uri:
+    url: "{{ awx_api_url }}/inventories/"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ awx_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "{{ inventory_name }}"
+      organization: "{{ awx_organization_id }}"
+    status_code: [201]
+    validate_certs: no
+    timeout: 30
+  when: (awx_inventory_search.json.count | default(0)) | int == 0
+  register: awx_inventory_create
+
+- name: Envanter ID'sini haritaya yaz ({{ inventory_name }})
+  set_fact:
+    inventory_name_to_id: "{{ inventory_name_to_id | combine({ inventory_name: ((awx_inventory_search.json.results[0].id) if (awx_inventory_search.json.count | default(0)) | int > 0 else (awx_inventory_create.json.id)) }) }}"
+
