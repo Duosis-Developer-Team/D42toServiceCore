@@ -2,7 +2,7 @@
 
 ## Genel Bakış
 
-Bu playbook, Device42'dan cihazları çekerek, verilen custom field isimlerine (CSV) tam eşleşme ve case-insensitive olarak uyan cihazların yalnızca IPv4 adreslerini, AWX'te aynı isimli envanterlere ekler. Envanterler yoksa ilgili organization altında otomatik oluşturulur.
+Bu playbook, Device42'dan cihazları çekerek, verilen custom field isimleri (CSV) cihazın custom field anahtarları içinde (case-sensitive) geçiyorsa o cihazın yalnızca IPv4 adreslerini AWX'te aynı isimli envanterlere ekler. Envanterler yoksa ilgili organization altında otomatik oluşturulur.
 
 ## Playbook Dosyası
 - **Dosya Adı**: `dbag-devices-to-awx-inventory.yaml`
@@ -43,7 +43,7 @@ Device42 API'sine bağlanarak tüm cihaz bilgilerini çeker:
 ```
 
 ### 3. Custom Field Filtreleme ve IPv4 Toplama
-`custom_field_names_csv` içinde verilen isimler için (örn: "dbag,critical,internal") tam eşleşme (case-insensitive) uygulanır ve eşleşen cihazların yalnız IPv4'leri toplanır. Her isim, AWX'te aynı isimdeki envantere karşılık gelir.
+`custom_field_names_csv` içinde verilen isimler için (örn: "DBAG,critical,internal") case-sensitive içerme kontrolü uygulanır ve eşleşen cihazların yalnız IPv4'leri toplanır. Her isim, AWX'te aynı isimdeki envantere karşılık gelir.
 
 ```yaml
 - name: dbag custom field'ı olan cihazları filtrele
@@ -127,7 +127,7 @@ Her isim için önce AWX'te envanter araması yapılır (`/inventories/?name=<na
 Playbook, Device42'daki cihazların custom field'larını kontrol eder ve şu kriterlere uyanları seçer:
 
 1. **Custom Fields Varlığı**: Cihazın `custom_fields` özelliği tanımlı olmalı.
-2. **Tam Eşleşme (Case-Insensitive)**: `custom_fields[].key | lower` içinde hedef isim `lower` haliyle bulunmalı.
+2. **İçerme (Case-Sensitive)**: `custom_fields[].key` içinde hedef isim tam haliyle geçmeli (ör. `DBAG` → `DBAG - Asset Owner`).
 3. **IPv4**: `ip_addresses[].ip` sadece IPv4 regex'ine uyanlar alınır.
 
 ### Örnek Filtreleme

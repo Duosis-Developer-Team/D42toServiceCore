@@ -18,14 +18,12 @@
           | map('regex_replace', '^\s+|\s+$', '')
           | select('ne', '')
           | list }}
-    target_custom_field_names_lower: >-
-      {{ target_custom_field_names | map('lower') | list }}
   tasks:
-    - name: Debug AWX API URL and target custom field names (lower)
+    - name: Debug AWX API URL and target custom field names (case-sensitive)
       debug:
         msg:
           - "AWX API URL: {{ awx_api_url }}"
-          - "Target custom fields (lower): {{ target_custom_field_names_lower }}"
+          - "Target custom fields: {{ target_custom_field_names }}"
 
     - name: Test connectivity to AWX API
       uri:
@@ -60,7 +58,7 @@
       set_fact:
         inventory_name_to_hosts: {}
 
-    - name: Build IPv4 host lists for all target custom field names (exact, case-insensitive)
+    - name: Build IPv4 host lists for all target custom field names (contains, case-sensitive)
       set_fact:
         inventory_name_to_hosts: >-
           {{ inventory_name_to_hosts | combine({ inv_name: (((inventory_name_to_hosts[inv_name] | default([]))
@@ -69,10 +67,10 @@
       vars:
         dev: "{{ item.0 }}"
         inv_name: "{{ item.1 }}"
-      loop: "{{ d42_devices | product(target_custom_field_names_lower) | list }}"
+      loop: "{{ d42_devices | product(target_custom_field_names) | list }}"
       when:
         - dev.custom_fields is defined
-        - inv_name in (dev.custom_fields | map(attribute='key') | map('lower') | list)
+        - (dev.custom_fields | map(attribute='key') | select('search', inv_name | regex_escape) | list | length) > 0
 
     - name: Summary debug - inventory_name_to_hosts
       debug:
