@@ -1,0 +1,172 @@
+---
+- name: Webhook ile gelen alert'e göre belirtilen dizindeki dosyaları temizle
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # Silinecek dizin yolu - AWX'den değiştirilebilir
+    target_directory: "{{ target_directory | default('/test') }}"
+    # Zabbix API bilgileri
+    zabbix_api_url: "http://213.153.197.248:8081/zabbix/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "Zxcmnbvcx851*"
+  tasks:
+    - name: Tüm gelen değişkenleri debug et
+      debug:
+        msg: 
+          - "=== WEBHOOK PAYLOAD DEBUG ==="
+          - "Event Name: {{ event_name | default('TANIMSIZ') }}"
+          - "Event ID: {{ event_id | default('TANIMSIZ') }}"
+          - "Host Name: {{ host_name | default('TANIMSIZ') }}"
+          - "Host IP: {{ host_ip | default('TANIMSIZ') }}"
+          - "Target Directory: {{ target_directory | default('TANIMSIZ') }}"
+          - "=== PAYLOAD SONU ==="
+
+    - name: Webhook payload'ını debug et
+      debug:
+        msg: 
+          - "Event: {{ event_name | default('Bilinmiyor') }}"
+          - "Event ID: {{ event_id | default('Bilinmiyor') }}"
+          - "Host: {{ host_name | default('Bilinmiyor') }}"
+          - "IP: {{ host_ip | default('Bilinmiyor') }}"
+          - "Hedef Dizin: {{ target_directory }}"
+
+    - name: Host'un variable'larını al
+      set_fact:
+        target_host: "{{ host_name }}"
+        server_ip: "{{ host_ip }}"
+        server_username: "duosis"
+        server_password: "Qwerasdf1234"
+        ssh_port: "{{ ssh_port | default(22) }}"
+
+    - name: Hedef sunucuya bağlantıyı test et
+      ping:
+      delegate_to: "{{ target_host }}"
+      vars:
+        ansible_host: "{{ server_ip }}"
+        ansible_user: "{{ server_username }}"
+        ansible_password: "{{ server_password }}"
+        ansible_port: "{{ ssh_port }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30'
+
+    - name: Hedef sunucuya bağlan ve belirtilen dizindeki dosyaları temizle
+      block:
+        - name: Hedef dizinin varlığını kontrol et
+          stat:
+            path: "{{ target_directory }}"
+          register: dir_stat
+
+        - name: Hedef dizinin içindeki tüm dosya ve dizinleri sil (dizini koru)
+          command: rm -rf "{{ target_directory }}"/*
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
+
+        - name: Gizli dosyaları da sil (. ile başlayan dosyalar)
+          command: rm -rf "{{ target_directory }}"/.[!.]*
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
+          ignore_errors: yes
+
+        - name: Temizlik sonrası hedef dizini kontrol et
+          command: ls -la "{{ target_directory }}"
+          register: cleanup_result
+          when: dir_stat.stat.exists and dir_stat.stat.isdir
+
+        - name: Temizlik sonucunu raporla
+          debug:
+            msg: 
+              - "Temizlik tamamlandı!"
+              - "Hedef dizin: {{ target_directory }}"
+              - "Dizin içeriği: {{ cleanup_result.stdout_lines | default('Dizin bulunamadı') }}"
+
+      delegate_to: "{{ target_host }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_host: "{{ server_ip }}"
+        ansible_user: "{{ server_username }}"
+        ansible_password: "{{ server_password }}"
+        ansible_port: "{{ ssh_port }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30'
+
+    # Zabbix entegrasyonu - Sistem kaynak analizi ve raporlama
+    - name: Zabbix entegrasyonu başlatılıyor
+      debug:
+        msg: "=== ZABBIX ENTEGRASYONU BAŞLATILIYOR ==="
+
+    - name: Hedef sunucuda sistem kaynak analizi yap
+      block:
+        - name: Top 10 CPU kullanım process'lerini al
+          shell: ps -eo pid,ppid,cmd,%cpu --sort=-%cpu | head -11
+          register: top_cpu_processes
+
+        - name: Top 10 Memory kullanım process'lerini al
+          shell: ps -eo pid,ppid,cmd,%mem --sort=-%mem | head -11
+          register: top_mem_processes
+
+        - name: Sistem kaynak raporunu oluştur
+          set_fact:
+            cpu_report: "=== TOP 10 CPU PROCESSES ===\n{{ top_cpu_processes.stdout }}"
+            mem_report: "=== TOP 10 MEMORY PROCESSES ===\n{{ top_mem_processes.stdout }}"
+            full_report: "Sistem kaynak kullanımı raporu:\n\n=== TOP 10 CPU PROCESSES ===\n{{ top_cpu_processes.stdout }}\n\n=== TOP 10 MEMORY PROCESSES ===\n{{ top_mem_processes.stdout }}"
+
+        - name: Sistem kaynak raporunu debug et
+          debug:
+            msg: "{{ full_report }}"
+
+      delegate_to: "{{ target_host }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_host: "{{ server_ip }}"
+        ansible_user: "{{ server_username }}"
+        ansible_password: "{{ server_password }}"
+        ansible_port: "{{ ssh_port }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=30'
+
+    - name: Zabbix API token al
+      uri:
+        url: "{{ zabbix_api_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+        status_code: 200
+      register: zabbix_auth_response
+
+    - name: Zabbix API token'ı kontrol et
+      debug:
+        msg: "Zabbix API token alındı: {{ zabbix_auth_response.json.result }}"
+      when: zabbix_auth_response.json.result is defined
+
+    - name: Zabbix event'i acknowledge et ve rapor gönder
+      uri:
+        url: "{{ zabbix_api_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "event.acknowledge"
+          params:
+            eventids: ["{{ event_id | default('1') }}"]
+            action: 4
+            message: "{{ full_report }}"
+          auth: "{{ zabbix_auth_response.json.result }}"
+          id: 1
+        status_code: 200
+      register: zabbix_ack_response
+      when: zabbix_auth_response.json.result is defined
+
+    - name: Zabbix acknowledgment sonucunu raporla
+      debug:
+        msg: 
+          - "Zabbix event acknowledgment tamamlandı!"
+          - "Event ID: {{ event_id | default('1') }}"
+          - "Response: {{ zabbix_ack_response.json }}"
+      when: zabbix_ack_response is defined
+
+    - name: Zabbix entegrasyonu tamamlandı
+      debug:
+        msg: "=== ZABBIX ENTEGRASYONU TAMAMLANDI ===" 

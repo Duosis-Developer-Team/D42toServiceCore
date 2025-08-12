@@ -1,0 +1,78 @@
+---
+- name: Device42'dan cihaz çek ve dbag inventory'sine ekle
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # Bu değişkenler AWX'den gelecek
+    device42_api_url: "{{ device42_api_url }}"
+    device42_username: "{{ device42_username }}"
+    device42_password: "{{ device42_password }}"
+    awx_api_url: "{{ awx_api_url }}"
+    awx_token: "{{ awx_token }}"
+    dbag_inventory_id: "{{ dbag_inventory_id }}"
+  tasks:
+    - name: AWX API URL'sini debug et
+      debug:
+        msg: "AWX API URL: {{ awx_api_url }}"
+
+    - name: AWX API bağlantısını test et
+      uri:
+        url: "{{ awx_api_url }}/ping/"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ awx_token }}"
+        validate_certs: no
+        timeout: 30
+      register: awx_ping_result
+
+    - name: AWX API test sonucunu göster
+      debug:
+        var: awx_ping_result
+
+    - name: Device42'dan cihazları çek
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        user: "{{ device42_username }}"
+        password: "{{ device42_password }}"
+        force_basic_auth: yes
+        return_content: yes
+        validate_certs: no
+      register: d42_response
+
+    - name: dbag custom field'ı olan cihazları filtrele
+      set_fact:
+        dbag_devices: "{{ d42_response.json.Devices | selectattr('custom_fields', 'defined') | list }}"
+
+    - name: dbag custom field'ı olan cihazları ve ip'lerini bul
+      set_fact:
+        dbag_hosts: "{{ dbag_hosts | default([]) + (item.ip_addresses | map(attribute='ip') | list) }}"
+      loop: "{{ dbag_devices }}"
+      when: >
+        item.custom_fields is defined and
+        item.custom_fields | selectattr('key', 'search', '^dbag', ignorecase=True) | list | length > 0
+
+    - name: dbag_hosts listesini unique yap
+      set_fact:
+        dbag_hosts: "{{ dbag_hosts | unique }}"
+
+    - name: Bulunan IP'leri debug et
+      debug:
+        msg: "DBAG IP'leri: {{ dbag_hosts }}"
+
+    - name: dbag inventory'sine host ekle
+      uri:
+        url: "{{ awx_api_url }}/inventories/{{ dbag_inventory_id }}/hosts/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ awx_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ item }}"
+          inventory: "{{ dbag_inventory_id }}"
+        status_code: [201, 409]  # 409 = zaten var
+        validate_certs: no
+        timeout: 30
+      loop: "{{ dbag_hosts }}"
+      when: dbag_hosts | length > 0 

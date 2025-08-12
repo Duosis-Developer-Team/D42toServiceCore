@@ -1,0 +1,322 @@
+---
+- name: D42 ve SMAX cihazlarını karşılaştır
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # D42 için
+    device42_api_url: "{{ device42_api_url }}"  # AWX Extra Vars ile gelmeli
+    device42_auth_header: "{{ device42_auth_header }}"  # AWX Extra Vars ile gelmeli
+    # SMAX için
+    smax_token_url: "{{ smax_token_url }}"  # AWX Extra Vars ile gelmeli
+    smax_user: "{{ smax_user }}"  # AWX Extra Vars ile gelmeli
+    smax_pass: "{{ smax_pass }}"  # AWX Extra Vars ile gelmeli
+    smax_api_url: "{{ smax_api_url }}"  # AWX Extra Vars ile gelmeli
+    smax_layout: "LastUpdateTime,DisplayLabel,Description,Cpus,MemorySize,RunningSoftwares,D42id_c,IpAddresses,OsName,DiskDevices,NetworkCards"
+    smax_tenantid: "669866050"
+
+  tasks:
+    - name: D42 cihazlarını çek
+      uri:
+        url: "{{ device42_api_url }}"
+        method: GET
+        headers:
+          Authorization: "{{ device42_auth_header }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: d42_response
+
+    - name: D42 cihaz listesini çıkar
+      set_fact:
+        d42_devices: "{{ d42_response.json.Devices | default(d42_response.json.devices) }}"
+
+    - name: SMAX token al
+      uri:
+        url: "{{ smax_token_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ { 'Login': smax_user, 'Password': smax_pass } | to_json }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_token_response
+
+    - name: SMAX token'ı çıkar
+      set_fact:
+        smax_token: "{{ smax_token_response.content }}"
+
+    - name: SMAX token response'unu göster
+      debug:
+        var: smax_token_response
+
+    - name: SMAX cihazlarını çek
+      uri:
+        url: "{{ smax_api_url }}?layout={{ smax_layout | urlencode }}"
+        method: GET
+        headers:
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}; TENANTID={{ smax_tenantid }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: smax_response
+
+    - name: SMAX cihaz çekme response'unu göster
+      debug:
+        var: smax_response
+
+    - name: SMAX cihaz çekme response'unun json'unu göster
+      debug:
+        var: smax_response.json
+
+    - name: SMAX cihaz listesini çıkar
+      set_fact:
+        smax_devices: "{{ smax_response.json.entities | default([]) }}"
+
+    - name: SMAX cihazlarını Device42 formatına dönüştür
+      set_fact:
+        smax_devices_mapped: []
+
+    - name: SMAX cihazlarını Device42 formatına güvenli şekilde dönüştür (her cihaz için)
+      set_fact:
+        smax_devices_mapped: "{{ smax_devices_mapped + [ mapped_device ] }}"
+      vars:
+        nc_decoded: >-
+          {{ (item.properties.NetworkCards | from_json) if (item.properties.NetworkCards is defined and item.properties.NetworkCards|length > 0) else [] }}
+        mapped_device:
+          device_id: "{{ item.properties.D42id_c | default('') }}"
+          name: "{{ item.properties.DisplayLabel | default('') }}"
+          manufacturer: "{{ item.properties.Vendor | default('') }}"
+          hw_model: "{{ item.properties.Model | default('') }}"
+          ip_addresses: >-
+            {{ (item.properties.IpAddresses | from_json) if (item.properties.IpAddresses is defined and item.properties.IpAddresses|length > 0) else [] }}
+          mac_addresses: >-
+            {{ nc_decoded if nc_decoded is iterable and nc_decoded is not string else [] | map(attribute='MacAddress') | list }}
+          cpus: >-
+            {{ (item.properties.Cpus | from_json) if (item.properties.Cpus is defined and item.properties.Cpus|length > 0) else [] }}
+          hdd_details: >-
+            {{ (item.properties.DiskDevices | from_json) if (item.properties.DiskDevices is defined and item.properties.DiskDevices|length > 0) else [] }}
+          memory: "{{ item.properties.MemorySize | default('') }}"
+          os: "{{ item.properties.OsName | default('') }}"
+          last_update_time: "{{ item.properties.LastUpdateTime | default(0) }}"
+          SMAX_ID: "{{ item.properties.Id | default('') }}"
+      loop: "{{ smax_devices }}"
+
+    - name: SMAX cihazlarının Device42 formatındaki halini göster
+      debug:
+        var: smax_devices_mapped
+
+    - name: Device42'den gelen cihaz adlarını göster
+      debug:
+        msg: "{{ d42_devices | map(attribute='name') | list }}"
+
+    - name: SMAX'ten gelen cihaz adlarını göster
+      debug:
+        msg: "{{ smax_devices_mapped | map(attribute='name') | list }}"
+
+    - name: D42 ve SMAX cihazlarını isim (name) üzerinden eşleştir
+      set_fact:
+        d42_names: "{{ d42_devices | map(attribute='name') | select('string') | list }}"
+        smax_names: "{{ smax_devices_mapped | map(attribute='name') | select('string') | list }}"
+
+    - name: D42'de olup SMAX'de olmayan cihazları bul (Yeni Yazdırılacak Cihazlar)
+      set_fact:
+        yeni_yazdirilacak_cihazlar: >-
+          {{ d42_devices | selectattr('name', 'defined') | selectattr('name', 'in', (d42_names | difference(smax_names))) | list }}
+
+    - name: SMAX cihazlarını isimden dict'e çevir (last_update_time için)
+      set_fact:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+
+    - name: Ortak cihazlar için epoch değerlerini hazırla
+      set_fact:
+        epoch_karsilastirma_listesi: "{{ epoch_karsilastirma_listesi_raw | from_yaml }}"
+      vars:
+        epoch_karsilastirma_listesi_raw: |
+          [
+          {% set smax_dict = dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) -%}
+          {% set common_names = d42_names | intersect(smax_names) -%}
+          {%- for d42_device in d42_devices if d42_device.name is defined and d42_device.name in common_names and d42_device.last_updated is defined %}
+            {%- set smax_device = smax_dict.get(d42_device.name) -%}
+            {%- if smax_device and smax_device.last_update_time is defined %}
+              {
+                "name": "{{ d42_device.name }}",
+                "d42_last_updated": "{{ d42_device.last_updated }}",
+                "d42_epoch": {{ (d42_device.last_updated | to_datetime('%Y-%m-%dT%H:%M:%S.%fZ')).timestamp() | int }},
+                "smax_last_update_time": "{{ smax_device.last_update_time }}",
+                "smax_epoch": {{ (smax_device.last_update_time | int // 1000) }},
+                "d42_device": {{ d42_device }}
+              }{{ ',' if not loop.last else '' }}
+            {%- endif %}
+          {%- endfor %}
+          ]
+
+    - name: Epoch değerlerini int'e çeviren yeni liste oluştur (loop ile)
+      set_fact:
+        epoch_karsilastirma_listesi_int: "{{ epoch_karsilastirma_listesi_int | default([]) + [ {
+          'name': item.name,
+          'd42_last_updated': item.d42_last_updated,
+          'd42_epoch': (item.d42_epoch | int),
+          'smax_last_update_time': item.smax_last_update_time,
+          'smax_epoch': (item.smax_epoch | int),
+          'd42_device': item.d42_device
+        } ] }}"
+      loop: "{{ epoch_karsilastirma_listesi }}"
+
+    - name: Sadece epoch alanları int olanları yeni listeye ekle
+      set_fact:
+        epoch_karsilastirma_listesi_int_filtered: "{{ epoch_karsilastirma_listesi_int_filtered | default([]) + [ item ] }}"
+      when: (item.d42_epoch is not none and item.smax_epoch is not none and (item.d42_epoch | type_debug) == 'int' and (item.smax_epoch | type_debug) == 'int')
+      loop: "{{ epoch_karsilastirma_listesi_int }}"
+
+    - name: LastUpdated karşılaştırması yap ve güncellenecek cihazları belirle
+      set_fact:
+        guncellenecek_cihazlar: >-
+          {% set result = [] %}
+          {% for item in epoch_karsilastirma_listesi_int_filtered %}
+            {% if item.d42_device is defined
+                  and item.d42_epoch is defined and item.smax_epoch is defined
+                  and (item.d42_epoch | type_debug) == 'int'
+                  and (item.smax_epoch | type_debug) == 'int'
+                  and item.d42_epoch > item.smax_epoch %}
+              {% set _ = result.append(item.d42_device) %}
+            {% endif %}
+          {% endfor %}
+          {{ result }}
+
+    - name: epoch_karsilastirma_listesi_int içeriğini göster
+      debug:
+        var: epoch_karsilastirma_listesi_int
+
+    - name: epoch_karsilastirma_listesi_int eleman tiplerini göster
+      debug:
+        msg: |
+          {% for item in epoch_karsilastirma_listesi_int %}
+          name: {{ item.name | default('YOK') }}
+          d42_epoch: {{ item.d42_epoch }} ({{ item.d42_epoch | type_debug }})
+          smax_epoch: {{ item.smax_epoch }} ({{ item.smax_epoch | type_debug }})
+          ---
+          {% endfor %}
+
+    - name: guncellenecek_cihazlar'ı listeye çevir (gerekirse)
+      set_fact:
+        guncellenecek_cihazlar: "{{ guncellenecek_cihazlar | from_yaml }}"
+      when: guncellenecek_cihazlar is string
+
+    - name: Sonuçları göster
+      debug:
+        msg: |
+          Yeni Yazdırılacak Cihazlar (D42'de olup SMAX'de olmayanlar):
+          {{ yeni_yazdirilacak_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
+
+          Güncellenecek Cihazlar (LastUpdated karşılaştırmalı):
+          {{ guncellenecek_cihazlar | default([]) | selectattr('name', 'defined') | map(attribute='name') | list }}
+
+    - name: update_payloads listesini başlat
+      set_fact:
+        update_payloads: []
+
+    - name: Güncellenecek cihazlar için update payloadlarını ekle
+      set_fact:
+        update_payloads: "{{ update_payloads + [ update_payload ] }}"
+      vars:
+        smax_dict: "{{ dict(smax_devices_mapped | map(attribute='name') | zip(smax_devices_mapped)) }}"
+        smax: "{{ smax_dict[item.name] }}"
+        clean_network_cards: >-
+          [{% for mac in item.mac_addresses | default([]) %}
+            {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "{{ mac.port_name | default('') }}", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
+          {% endfor %}]
+        update_payload:
+          entities:
+            - entity_type: "Device"
+              properties:
+                SubType: "Server"
+                MemorySize: "{{ (item.ram | default(item.memory | default(0))) | int }}"
+                BiosSerialNumber: "{{ item.serial_no | default('') }}"
+                BiosUUID: "{{ item.uuid | default('') }}"
+                Id: "{{ smax.SMAX_ID | default('') }}"
+                HostName: "{{ item.name | default('') }}"
+                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+                OsName: "{{ item.os | default('') }}"
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0 and (item.hdd_details | select('mapping') | list | length > 0)) | ternary((item.hdd_details | select('mapping') | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': clean_network_cards } | to_json }}"
+                Vendor: "{{ item.manufacturer | default('') }}"
+                Model: "{{ item.hw_model | default('') }}"
+                Environment: "{{ item.service_level | default('') }}"
+          operation: "UPDATE"
+      loop: "{{ guncellenecek_cihazlar }}"
+      loop_control:
+        loop_var: item
+
+    - name: Güncellenecek cihazları SMAX'e update olarak gönder
+      uri:
+        url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
+        method: POST
+        headers:
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
+          Content-Type: "application/json"
+        body: "{{ item | to_json }}"
+        body_format: raw
+        status_code: 200,201,202
+        validate_certs: no
+        return_content: yes
+      loop: "{{ update_payloads }}"
+      loop_control:
+        label: "{{ item.entities[0].properties.HostName }}"
+      register: smax_update_responses
+
+    - name: insert_payloads listesini başlat
+      set_fact:
+        insert_payloads: []
+
+    - name: Yeni yazdırılacak cihazlar için insert payloadlarını ekle
+      set_fact:
+        insert_payloads: "{{ insert_payloads + [ insert_payload ] }}"
+      vars:
+        clean_network_cards: >-
+          [{% for mac in item.mac_addresses | default([]) %}
+            {"MacAddress": "{{ mac.mac | default('') }}", "NetworkCardSpeed": "", "NetworkCardName": "{{ mac.port_name | default('') }}", "NetworkCardType": "", "NetworkCardRole": "", "GlobalId": "", "Keep": "", "Id": ""}{% if not loop.last %},{% endif %}
+          {% endfor %}]
+        insert_payload:
+          entities:
+            - entity_type: "Device"
+              properties:
+                SubType: "Server"
+                MemorySize: "{{ (item.ram | default(item.memory | default(0))) | int }}"
+                BiosSerialNumber: "{{ item.serial_no | default('') }}"
+                BiosUUID: "{{ item.uuid | default('') }}"
+                HostName: "{{ item.name | default('') }}"
+                D42id_c: "{{ item.device_id | default(item.id) | default('') }}"
+                OsName: "{{ item.os | default('') }}"
+                IpAddresses: "{{ {'IpAddress': [ { 'IpValue': (item.ip_addresses | default([]) | first | default({})).ip | default(item.ip_address | default(item.primary_ip | default(item.ip | default('')))), 'IpType': '', 'AuthoritativeDNSName': '', 'RoutingDomain': '', 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                Cpus: "{{ {'Cpu': [ { 'CpuType': item.cpu_model | default(''), 'CpuVendor': item.cpu_vendor | default(''), 'CpuClockSpeed': (item.cpuspeed | default('') | string), 'CpuId': '1', 'CpuCoreNumber': item.cpu_count | default(item.cpus | default(1)), 'GlobalId': '', 'Keep': '', 'Id': '' } ] } | to_json }}"
+                DiskDevices: "{{ {'DiskDevice': (item.hdd_details is defined and item.hdd_details is not none and item.hdd_details|length > 0 and (item.hdd_details | select('mapping') | list | length > 0)) | ternary((item.hdd_details | select('mapping') | map('combine', {'DiskName': item.name | default(''), 'DiskSize': item.size | default(''), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}) | list), [{'DiskName': (item.name | default('')) + '_disk', 'DiskSize': item.hddsize | default(item.disk_size | default(0)), 'DiskModelName': 'scsi', 'DiskVendor': '', 'DiskType': 'virtual', 'GlobalId': '', 'Keep': '', 'Id': ''}])} | to_json }}"
+                NetworkCards: "{{ {'NetworkCard': clean_network_cards } | to_json }}"
+                Vendor: "{{ item.manufacturer | default('') }}"
+                Model: "{{ item.hw_model | default('') }}"
+                Environment: "{{ item.service_level | default('') }}"
+          operation: "CREATE"
+      loop: "{{ yeni_yazdirilacak_cihazlar }}"
+      loop_control:
+        loop_var: item
+
+    - name: Yeni yazdırılacak cihazları SMAX'e insert olarak gönder
+      uri:
+        url: "https://destek.kafein.com.tr/rest/669866050/ems/bulk"
+        method: POST
+        headers:
+          Cookie: "SMAX_AUTH_TOKEN={{ smax_token }}"
+          Content-Type: "application/json"
+        body: "{{ item | to_json }}"
+        body_format: raw
+        status_code: 200,201,202
+        validate_certs: no
+        return_content: yes
+      loop: "{{ insert_payloads }}"
+      loop_control:
+        label: "{{ item.entities[0].properties.HostName }}"
+      register: smax_insert_responses
+
